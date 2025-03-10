@@ -190,24 +190,11 @@ void update_scene()
 	{
 		if (mSelectedControl == 0) 
 		{
-			return;
-		}
-		else if (mSelectedControl == 1) 
-		{
-			return;
-		}
-		else if (mSelectedControl == 2) 
-		{
-			utils::reboot();
-			return;
-		}
-		else if (mSelectedControl == 3) 
-		{
-			utils::shutdown();
+			utils::ReturnToDashboard();
 			return;
 		}
 	}
-
+/*
 	// Down Actions
 
 	if (inputManager::buttonPressed(ButtonDpadDown))
@@ -221,6 +208,21 @@ void update_scene()
 	{
 		mSelectedControl = mSelectedControl > 0 ? mSelectedControl - 1 : 3; 
 	}
+*/
+	// Ensure mSelectedControl is always set to 0 (or any fixed value)
+mSelectedControl = 0;
+
+// Down Actions (Disabled)
+if (inputManager::buttonPressed(ButtonDpadDown))
+{
+    // Do nothing
+}
+
+// Up Actions (Disabled)
+if (inputManager::buttonPressed(ButtonDpadUp))
+{
+    // Do nothing
+}
 
 	network::init();
 }
@@ -229,22 +231,18 @@ void render_scene()
 {
 	component::panel(theme::getPanelFillColor(), theme::getPanelStrokeColor(), 16, 16, 688, 448);
 
-	int32_t yPos = (context::getBufferHeight() - (4 * 40) - 10) / 2;
-	yPos += theme::getCenterOffset();
+    int32_t yPos = (context::getBufferHeight() - (3 * 40) - 10) / 2;
+    yPos += theme::getCenterOffset();
+	    // Welcome text
+    drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), 
+                                     "Welcome to UIX Lite FTPd. Powered by PrometheOS.", 
+                                     theme::getFooterTextColor(), 
+                                     horizAlignmentCenter, 
+                                     193, yPos, 322);
 
-	component::button(mSelectedControl == 0, false, "EqUiNoX Was Here", 193, yPos, 322, 30);
-
-	yPos += 40;
-
-	component::button(mSelectedControl == 1, false, "System", 193, yPos, 322, 30);
-
-	yPos += 40;
-
-	component::button(mSelectedControl == 2, false, "Reboot", 193, yPos, 322, 30);
-
-	yPos += 40;
-
-	component::button(mSelectedControl == 3, false, "Shutdown", 193, yPos, 322, 30);
+    yPos += 40;
+	    // Reboot button (last item)
+    component::button(mSelectedControl == 0, false, "Return to Dashboard", 193, yPos, 322, 30);
 
 	char* currentIp = context::getCurrentIp();
 	char* ip = stringUtility::formatString("IP %s", currentIp);

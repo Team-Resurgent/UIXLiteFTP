@@ -212,7 +212,9 @@ void utils::setLedStates(uint32_t ledStates)
 	HalWriteSMBusByte(SMC_SLAVE_ADDRESS, SMC_COMMAND_LED_STATES, ledStates);
     HalWriteSMBusByte(SMC_SLAVE_ADDRESS, SMC_COMMAND_LED_OVERRIDE, SMC_LED_OVERRIDE_USE_REQUESTED_LED_STATES);
 }
-
+void utils::ReturnToDashboard() {
+    HalReturnToFirmware(RETURN_FIRMWARE_QUICK_REBOOT);
+}
 uint32_t utils::roundUpToNextPowerOf2(uint32_t value) 
 {
 	value--;

@@ -4,7 +4,7 @@
 	Version="7.10"
 	Name="UIXLiteFTP"
 	ProjectGUID="{03813F8D-2AD5-44E4-B724-44240DB90B0B}"
-	RootNamespace="PrometheOS"
+	RootNamespace="UIXLiteFTP"
 	Keyword="XboxProj">
 	<Platforms>
 		<Platform
@@ -60,7 +60,7 @@
 				ForceCopy="TRUE"/>
 			<Tool
 				Name="XboxImageTool"
-				FileName="$(TargetDir)PrometheOS-Launcher.xbe"
+				FileName="$(TargetDir)UIXLiteFTP.xbe"
 				StackSize="0x40000"
 				IncludeDebugInfo="TRUE"
 				LimitAvailableMemoryTo64MB="FALSE"
@@ -124,7 +124,7 @@
 				ForceCopy="TRUE"/>
 			<Tool
 				Name="XboxImageTool"
-				FileName="$(TargetDir)PrometheOS-Launcher.xbe"
+				FileName="$(TargetDir)UIXLiteFTP.xbe"
 				StackSize="0x20000"
 				LimitAvailableMemoryTo64MB="FALSE"
 				DontModifyHD="TRUE"
