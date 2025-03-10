@@ -53,6 +53,7 @@ public:
 	static void* mallocWithTerminator(uint32_t size);
 	static void* mallocCopyWithTerminator(void* source, uint32_t size, uint32_t copySize);
 	static void reboot();
+	static void ReturnToDashboard();
 	static void shutdown();
 	static uint32_t getFreePhysicalMemory();
 	static uint32_t getTotalPhysicalMemory();
