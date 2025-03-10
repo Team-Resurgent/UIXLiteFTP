@@ -126,46 +126,6 @@ uint32_t theme::getFooterY()
 	return mThemeData.FOOTER_Y;
 }
 
-uint32_t theme::getSnakeWallColor()
-{
-	return mThemeData.SNAKE_WALL_COLOR;
-}
-
-uint32_t theme::getSnakeFoodColor()
-{
-	return mThemeData.SNAKE_FOOD_COLOR;
-}
-
-uint32_t theme::getSnakeHeadColor()
-{
-	return mThemeData.SNAKE_HEAD_COLOR;
-}
-
-uint32_t theme::getSnakeTailColor()
-{
-	return mThemeData.SNAKE_TAIL_COLOR;
-}
-
-uint32_t theme::getInvadersWallColor()
-{
-	return mThemeData.INVADERS_WALL_COLOR;
-}
-
-uint32_t theme::getInvadersPlayerColor()
-{
-	return mThemeData.INVADERS_PLAYER_COLOR;
-}
-
-uint32_t theme::getInvadersBossColor()
-{
-	return mThemeData.INVADERS_BOSS_COLOR;
-}
-
-uint32_t theme::getInvadersAlienColor()
-{
-	return mThemeData.INVADERS_ALIEN_COLOR;
-}
-
 uint32_t theme::getJoyButtonAColor()
 {
 	return mThemeData.JOY_BUTTON_A_COLOR;
@@ -312,16 +272,6 @@ void theme::loadSkin()
 	mThemeData.HEADER_Y = THEME_HEADER_Y;
 	mThemeData.CENTER_OFFSET = THEME_CENTER_OFFSET;
 	mThemeData.FOOTER_Y = THEME_FOOTER_Y;
-
-	mThemeData.SNAKE_WALL_COLOR = THEME_SNAKE_WALL_COLOR;
-	mThemeData.SNAKE_FOOD_COLOR = THEME_SNAKE_FOOD_COLOR;
-	mThemeData.SNAKE_HEAD_COLOR = THEME_SNAKE_HEAD_COLOR;
-	mThemeData.SNAKE_TAIL_COLOR = THEME_SNAKE_TAIL_COLOR;
-
-	mThemeData.INVADERS_WALL_COLOR = THEME_INVADERS_WALL_COLOR;
-	mThemeData.INVADERS_PLAYER_COLOR = THEME_INVADERS_PLAYER_COLOR;
-	mThemeData.INVADERS_BOSS_COLOR = THEME_INVADERS_BOSS_COLOR;
-	mThemeData.INVADERS_ALIEN_COLOR = THEME_INVADERS_ALIEN_COLOR;
 
 	mThemeData.JOY_BUTTON_A_COLOR = THEME_JOY_BUTTON_A_COLOR;
 	mThemeData.JOY_BUTTON_B_COLOR = THEME_JOY_BUTTON_B_COLOR;
