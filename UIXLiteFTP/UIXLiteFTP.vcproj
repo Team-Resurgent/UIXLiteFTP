@@ -187,6 +187,9 @@
 				RelativePath=".\stringUtility.cpp">
 			</File>
 			<File
+				RelativePath=".\temp.h">
+			</File>
+			<File
 				RelativePath=".\theme.cpp">
 			</File>
 			<File
@@ -233,9 +236,6 @@
 			</File>
 			<File
 				RelativePath=".\inputManager.h">
-			</File>
-			<File
-				RelativePath=".\json.h">
 			</File>
 			<File
 				RelativePath=".\math.h">
@@ -286,7 +286,7 @@
 				Name="Assets"
 				Filter="">
 				<File
-					RelativePath=".\Assets\background_jpg.h">
+					RelativePath=".\Assets\base_jpg.h">
 				</File>
 				<Filter
 					Name="Font"

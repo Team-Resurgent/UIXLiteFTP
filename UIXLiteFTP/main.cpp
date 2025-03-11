@@ -132,7 +132,7 @@ bool createDevice()
 	params.BackBufferFormat = D3DFMT_X8R8G8B8;
     params.BackBufferCount = 1;
     params.EnableAutoDepthStencil = FALSE;
-	params.SwapEffect = D3DSWAPEFFECT_COPY;
+	params.SwapEffect = D3DSWAPEFFECT_DISCARD;
     params.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
 	LPDIRECT3DDEVICE8 d3dDevice;
@@ -142,19 +142,8 @@ bool createDevice()
         return false;
 	}
 	context::setD3dDevice(d3dDevice);
-
-	D3DXMATRIX matProjection;
-	D3DXMatrixOrthoOffCenterLH(&matProjection, 0, (float)context::getBufferWidth(), 0, (float)context::getBufferHeight(), 1.0f, 100.0f);
-	context::getD3dDevice()->SetTransform(D3DTS_PROJECTION, &matProjection);
-
-	D3DXMATRIX  matView;
-    D3DXMatrixIdentity(&matView);
-    context::getD3dDevice()->SetTransform( D3DTS_VIEW, &matView);
-
-	D3DXMATRIX matWorld;
-	D3DXMatrixIdentity(&matWorld);
-	context::getD3dDevice()->SetTransform( D3DTS_WORLD, &matWorld);
-
+    
+    context::getD3dDevice()->SetRenderState(D3DRS_ZFUNC, D3DCMP_NEVER);
 	context::getD3dDevice()->SetRenderState(D3DRS_LIGHTING, FALSE);
 	context::getD3dDevice()->SetVertexShader(D3DFVF_CUSTOMVERTEX);
 	context::getD3dDevice()->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
@@ -180,7 +169,36 @@ bool createDevice()
 	return true;
 }
 
-int mSelectedControl = 0;
+void render_sphere(float angle, utils::dataContainer* sphereMesh)
+{
+    const float deg_to_rad = 0.01745329252f;
+
+    D3DXMATRIX matWorld;
+    D3DXMatrixRotationY(&matWorld, -angle * deg_to_rad);
+
+    D3DXVECTOR3 cameraPosition(0.0f, 0.1f, 8.0f);
+    D3DXVECTOR3 target(0.0f, 0.0f, 7.0f);
+    D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);   
+
+    D3DXMATRIX matView;
+    D3DXMatrixLookAtLH(&matView, &cameraPosition, &target, &up);
+
+    D3DXMATRIX matProjection;
+    D3DXMatrixIdentity(&matProjection);
+    D3DXMatrixPerspectiveFovLH(&matProjection, 45 * deg_to_rad, (float)context::getBufferWidth() / (float)context::getBufferHeight(), 0.1f, 100.0f);
+   
+    context::getD3dDevice()->SetTransform( D3DTS_WORLD, &matWorld);
+    context::getD3dDevice()->SetTransform(D3DTS_VIEW, &matView);
+    context::getD3dDevice()->SetTransform(D3DTS_PROJECTION, &matProjection);
+
+    context::getD3dDevice()->SetRenderState(D3DRS_TEXTUREFACTOR, 0xff004000);
+    context::getD3dDevice()->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    context::getD3dDevice()->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID); 
+
+    image* imageToDraw = drawing::getImage("base");
+    context::getD3dDevice()->SetTexture(0, imageToDraw->texture);
+    context::getD3dDevice()->DrawPrimitiveUP(D3DPT_TRIANGLELIST, (sphereMesh->size / sizeof(meshUtility::vertex)) / 3, sphereMesh->data, sizeof(meshUtility::vertex));
+}
 
 void update_scene()
 {
@@ -188,65 +206,45 @@ void update_scene()
 
 	if (inputManager::buttonPressed(ButtonA))
 	{
-		if (mSelectedControl == 0) 
-		{
-			utils::ReturnToDashboard();
-			return;
-		}
+		utils::ReturnToDashboard();
+		return;
 	}
-/*
-	// Down Actions
-
-	if (inputManager::buttonPressed(ButtonDpadDown))
-	{
-		mSelectedControl = mSelectedControl < 3 ? mSelectedControl + 1 : 0;
-	}
-
-	// Up Actions
-
-	if (inputManager::buttonPressed(ButtonDpadUp))
-	{
-		mSelectedControl = mSelectedControl > 0 ? mSelectedControl - 1 : 3; 
-	}
-*/
-	// Ensure mSelectedControl is always set to 0 (or any fixed value)
-mSelectedControl = 0;
-
-// Down Actions (Disabled)
-if (inputManager::buttonPressed(ButtonDpadDown))
-{
-    // Do nothing
-}
-
-// Up Actions (Disabled)
-if (inputManager::buttonPressed(ButtonDpadUp))
-{
-    // Do nothing
-}
 
 	network::init();
 }
 
 void render_scene()
 {
+    // Setup Ortho Camera 
+
+    D3DXMATRIX matIdentity;
+    D3DXMatrixIdentity(&matIdentity);
+
+    D3DXMATRIX matProjection;
+	D3DXMatrixOrthoOffCenterLH(&matProjection, 0, (float)context::getBufferWidth(), 0, (float)context::getBufferHeight(), 1.0f, 800.0f);
+
+    context::getD3dDevice()->SetTransform(D3DTS_VIEW, &matIdentity);
+    context::getD3dDevice()->SetTransform(D3DTS_WORLD, &matIdentity);
+    context::getD3dDevice()->SetTransform(D3DTS_PROJECTION, &matProjection);
+    context::getD3dDevice()->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
+    context::getD3dDevice()->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+
+    // Render Menu
+
 	component::panel(theme::getPanelFillColor(), theme::getPanelStrokeColor(), 16, 16, 688, 448);
 
     int32_t yPos = (context::getBufferHeight() - (3 * 40) - 10) / 2;
     yPos += theme::getCenterOffset();
-	    // Welcome text
-    drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), 
-                                     "Welcome to UIX Lite FTPd. Powered by PrometheOS.", 
-                                     theme::getFooterTextColor(), 
-                                     horizAlignmentCenter, 
-                                     193, yPos, 322);
+
+    drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), "Welcome to UIX Lite FTPd. Powered by PrometheOS.", theme::getFooterTextColor(), horizAlignmentCenter, 193, yPos, 322);
 
     yPos += 40;
-	    // Reboot button (last item)
-    component::button(mSelectedControl == 0, false, "Return to Dashboard", 193, yPos, 322, 30);
+
+    component::button(true, false, "Return to Dashboard", 193, yPos, 322, 30);
 
 	char* currentIp = context::getCurrentIp();
-	char* ip = stringUtility::formatString("IP %s", currentIp);
-	drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), ip, theme::getFooterTextColor(), horizAlignmentCenter, 60 + (150 * 0), theme::getFooterY(), 150);
+    char* ip = stringUtility::formatString("IP: %s - Username: xbox - Password: xbox", currentIp);
+	drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), ip, theme::getFooterTextColor(), horizAlignmentCenter, 193, theme::getFooterY(), 322);
 	free(ip);
 	free(currentIp);
 }
@@ -280,8 +278,6 @@ void __cdecl main()
 {
 	utils::debugPrint("Welcome to PrometheOS Launcher\n");
 
-	utils::setLedStates(SMC_LED_STATES_GREEN_STATE0 | SMC_LED_STATES_GREEN_STATE1 | SMC_LED_STATES_GREEN_STATE2 | SMC_LED_STATES_GREEN_STATE3);
-
 	bool deviceCreated = createDevice();
 
 	context::setNetworkInitialized(false);
@@ -299,29 +295,6 @@ void __cdecl main()
 
 	drawing::loadFont(&font_sfn[0]);
 
-	//\xC2\xA1 = A
-	//\xC2\xA2 = B
-	//\xC2\xA3 = X
-	//\xC2\xA4 = Y
-	//\xC2\xA5 = Folder
-	//\xC2\xA6 = File
-	//\xC2\xA7 = P
-	//\xC2\xA8 = R
-	//\xC2\xA9 = O
-	//\xC2\xAA = M
-	//\xC2\xAB = E
-	//\xC2\xAC = T
-	//\xC2\xAD = H
-	//\xC2\xAE = S
-	//\xC2\xAF = Cursor On
-	//\xC2\xB0 = Cursor Off
-	//\xC2\xB1 = Deg
-	//\xC2\xB2 = LT
-	//\xC2\xB3 = RT
-	//\xC2\xB4 = L
-	//\xC2\xB5 = White
-	//\xC2\xB6 = Black
-
 	bitmapFont* fontSmall = drawing::generateBitmapFont("FreeSans", SSFN_STYLE_REGULAR, 18, 18, 0, 256);
 	context::setBitmapFontSmall(fontSmall);
 	bitmapFont* fontMedium = drawing::generateBitmapFont("FreeSans", SSFN_STYLE_REGULAR, 25, 25, 0, 256);
@@ -332,19 +305,35 @@ void __cdecl main()
 	drawing::renderRoundedRect("panel-fill", 24, 24, 6, 0xffffffff, 0x00000000, 0);
 	drawing::renderRoundedRect("panel-stroke", 24, 24, 6, 0x01010100, 0xffffffff, 2);
 
+    utils::dataContainer* sphereMesh = meshUtility::createSphere();
+    drawing::loadImage((char*)base_jpg, sizeof(base_jpg), "base");
+    
+    float angle = 0;
     while (TRUE)
     {
-		context::getD3dDevice()->BeginScene();
-
 		inputManager::processController();
+        refreshInfo();
+
 		drawing::clearBackground((uint32_t)0);
 
-		refreshInfo();
+        // Render Sphere Background
+
+        render_sphere(angle, sphereMesh); 
+
+        // Process Input / Render Menu
 
 		update_scene();
 		render_scene();
 
+        // Present Rendered Results
+
 		context::getD3dDevice()->EndScene();
 		context::getD3dDevice()->Present(NULL, NULL, NULL, NULL);
+
+        angle += 0.05f;
+        if (angle > 360.0f)
+        {
+            angle -= 360.f;
+        }
     }
 }

@@ -31,4 +31,5 @@ public:
 
 	static utils::dataContainer* createQuadXY(const math::vec3F& position, const math::sizeF& size, const math::rectF& uvRect);
 	static utils::dataContainer* createNinePatchXY(const math::vec3F& position, const math::sizeF& size, const math::rectF& uvRect);
+    static utils::dataContainer* createSphere();
 };

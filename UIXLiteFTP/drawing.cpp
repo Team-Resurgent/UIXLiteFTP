@@ -180,25 +180,8 @@ bool drawing::loadFont(const uint8_t* data)
 
 void drawing::clearBackground(uint32_t index)
 {
-	char* backgroundName = stringUtility::formatString("background:%i", index);
-
 	uint32_t backgroundColor = theme::getBackgroundColor();
 	context::getD3dDevice()->Clear(0L, NULL, D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER|D3DCLEAR_STENCIL, (0xff << 24) | backgroundColor, 1.0f, 0L);
-
-	for (int i = 0; i < 2; i++)
-	{
-		int index = theme::getBackgroundOverlayAsUnderlay() == true ? (1 - i) : i;
-		if (index == 0 && imageExists(backgroundName) == true)
-		{
-			drawImage(backgroundName, theme::getBackgroundImageTint(), 0, 0, context::getBufferWidth(), context::getBufferHeight());
-		}
-		if (index == 1 && imageExists("background-overlay") == true)
-		{
-			drawImage("background-overlay", theme::getBackgroundOverlayImageTint(), 0, 0, context::getBufferWidth(), context::getBufferHeight());
-		}
-	}
-
-	free(backgroundName);
 }
 
 bool drawing::imageExists(const char* key)
