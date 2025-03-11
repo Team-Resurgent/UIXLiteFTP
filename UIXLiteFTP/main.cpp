@@ -2,6 +2,7 @@
 #include <xtl.h>
 #include <string>
 
+#include "audioPlayer.h"
 #include "component.h"
 #include "context.h"
 #include "drawing.h"
@@ -307,6 +308,9 @@ void __cdecl main()
 
     utils::dataContainer* sphereMesh = meshUtility::createSphere();
     drawing::loadImage((char*)base_jpg, sizeof(base_jpg), "base");
+
+    audioPlayer::init();
+    audioPlayer::play();
     
     float angle = 0;
     while (TRUE)

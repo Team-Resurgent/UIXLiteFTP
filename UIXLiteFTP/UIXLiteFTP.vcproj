@@ -142,6 +142,9 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
+				RelativePath=".\audioPlayer.cpp">
+			</File>
+			<File
 				RelativePath=".\component.cpp">
 			</File>
 			<File
@@ -181,6 +184,9 @@
 				RelativePath=".\socketUtility.cpp">
 			</File>
 			<File
+				RelativePath=".\stb_vorbis.cpp">
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp">
 			</File>
 			<File
@@ -209,6 +215,9 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 			<File
 				RelativePath=".\alignment.h">
+			</File>
+			<File
+				RelativePath=".\audioPlayer.h">
 			</File>
 			<File
 				RelativePath=".\component.h">
@@ -287,6 +296,9 @@
 				Filter="">
 				<File
 					RelativePath=".\Assets\base_jpg.h">
+				</File>
+				<File
+					RelativePath=".\Assets\engine_room_ogg.h">
 				</File>
 				<Filter
 					Name="Font"
