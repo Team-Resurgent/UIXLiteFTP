@@ -119,16 +119,6 @@ utils::dataContainer* meshUtility::createSphere()
             int v3 = (i + 1) * (LON_DIV + 1) + j;
             int v4 = v3 + 1;
 
-        //          vertex quadVertices[6] = {
-        //    {vertices[v4].position, {1.0f, 1.0f}}, // Top-right
-        //    {vertices[v2].position, {1.0f, 0.0f}}, // Bottom-right
-        //    {vertices[v1].position, {0.0f, 0.0f}}, // Bottom-left
-        //    
-        //    {vertices[v3].position, {0.0f, 1.0f}}, // Top-left
-        //    {vertices[v4].position, {1.0f, 1.0f}}, // Top-right
-        //    {vertices[v1].position, {0.0f, 0.0f}}, // Bottom-left
-        //};
-
             vertices[v4].texcoord.x = 1.0f;
             vertices[v4].texcoord.y = 1.0f;
             vertices[v2].texcoord.x = 1.0f;
