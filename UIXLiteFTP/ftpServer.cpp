@@ -454,7 +454,7 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 					memset(&saiPasv, 0, sizeof(SOCKADDR_IN));
 					saiPasv.sin_family = AF_INET;
 					saiPasv.sin_addr.s_addr = INADDR_ANY;
-					saiPasv.sin_port = portTest;		
+					saiPasv.sin_port = htons(portTest);		
 					if (socketUtility::createSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, sPasv))
 					{
 						found = true;
@@ -505,11 +505,11 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 				pointerVector<fileSystem::FileInfoDetail*>* fileInfoDetails = getDirectoryListing(newVirtual);
 				if (fileInfoDetails != NULL)
 				{
-					sprintf(szOutput, "150 Opening %s mode data connection for listing of \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
-					socketSendString(sCmd, szOutput);
 					sData = establishDataConnection(&saiData, &sPasv);
-					if (sData) 
-					{						
+                    if (sData) 
+                    {
+                        sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
+                        socketSendString(sCmd, szOutput);
 						const char * months[12] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
 						for (size_t i = 0; i < fileInfoDetails->count(); i++)
 						{
@@ -617,11 +617,11 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 						fileSystem::fileSeek(fileHandle, fileSystem::FileSeekModeStart, dwRestOffset);
 						dwRestOffset = 0;
 					}
-					sprintf(szOutput, "150 Opening %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
-					socketSendString(sCmd, szOutput);
 					sData = establishDataConnection(&saiData, &sPasv);
 					if (sData) 
 					{
+						sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
+						socketSendString(sCmd, szOutput);
 						if (sendSocketFile(sCmd, sData, fileHandle, &dw)) 
 						{
 							sprintf(szOutput, "226 \"%s\" transferred successfully.\r\n", newVirtual);
@@ -635,8 +635,10 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 								socketSendString(sCmd, "226 ABOR command successful.\r\n");
 							}
 						}
+						Sleep(200);
 						socketUtility::closeSocket(sData);
 					} 
+					
 					else 
 					{
 						socketSendString(sCmd, "425 Can't open data connection.\r\n");
@@ -676,11 +678,11 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 						fileSystem::fileTruncate(fileHandle, dwRestOffset);
 					}
 					dwRestOffset = 0;
-					sprintf(szOutput, "150 Opening %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
-					socketSendString(sCmd, szOutput);
 					sData = establishDataConnection(&saiData, &sPasv);
-					if (sData) 
-					{
+                    if (sData) 
+                    {
+                        sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
+                        socketSendString(sCmd, szOutput);
 						if (receiveSocketFile(sCmd, sData, fileHandle)) 
 						{
 							sprintf(szOutput, "226 \"%s\" transferred successfully.\r\n", newVirtual);
@@ -690,6 +692,7 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 						{
 							socketSendString(sCmd, "426 Connection closed; transfer aborted.\r\n");
 						}
+						Sleep(200);
 						socketUtility::closeSocket(sData);
 					} else {
 						socketSendString(sCmd, "425 Can't open data connection.\r\n");
@@ -1029,7 +1032,7 @@ bool ftpServer::init()
 
 	mMaxConnections = 20;
 	mCommandTimeout = 300;
-	mConnectTimeout = 15;
+	mConnectTimeout = 60;
 
 	socketUtility::createSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, sListen);
 
