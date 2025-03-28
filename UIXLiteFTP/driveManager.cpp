@@ -209,6 +209,21 @@ void driveManager::init()
 		m_drives->add(new drive("HDD0-Y", "HDD0-Y", "\\Device\\Harddisk0\\Partition4", driveTypeHardDrive));
 		m_drives->add(new drive("HDD0-Z", "HDD0-Z", "\\Device\\Harddisk0\\Partition5", driveTypeHardDrive));
 
+		m_drives->add(new drive("HDD1-C", "HDD1-C", "\\Device\\Harddisk1\\Partition2", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-E", "HDD1-E", "\\Device\\Harddisk1\\Partition1", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-F", "HDD1-F", "\\Device\\Harddisk1\\Partition6", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-G", "HDD1-G", "\\Device\\Harddisk1\\Partition7", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-H", "HDD1-H", "\\Device\\Harddisk1\\Partition8", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-I", "HDD1-I", "\\Device\\Harddisk1\\Partition9", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-J", "HDD1-J", "\\Device\\Harddisk1\\Partition10", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-K", "HDD1-K", "\\Device\\Harddisk1\\Partition11", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-L", "HDD1-L", "\\Device\\Harddisk1\\Partition12", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-M", "HDD1-M", "\\Device\\Harddisk1\\Partition13", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-N", "HDD1-N", "\\Device\\Harddisk1\\Partition14", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-X", "HDD1-X", "\\Device\\Harddisk1\\Partition3", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-Y", "HDD1-Y", "\\Device\\Harddisk1\\Partition4", driveTypeHardDrive));
+		m_drives->add(new drive("HDD1-Z", "HDD1-Z", "\\Device\\Harddisk1\\Partition5", driveTypeHardDrive));
+
 		m_drives->add(new drive("H", "MMU0", "", driveTypeMemoryUnit));
 		m_drives->add(new drive("I", "MMU1", "", driveTypeMemoryUnit));
 		m_drives->add(new drive("J", "MMU2", "", driveTypeMemoryUnit));
