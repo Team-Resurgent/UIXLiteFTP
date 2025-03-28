@@ -506,10 +506,10 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 				if (fileInfoDetails != NULL)
 				{
 					sData = establishDataConnection(&saiData, &sPasv);
-                    if (sData) 
+					if (sData) 
                     {
-                        sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
-                        socketSendString(sCmd, szOutput);
+						sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
+						socketSendString(sCmd, szOutput);
 						const char * months[12] = { "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec" };
 						for (size_t i = 0; i < fileInfoDetails->count(); i++)
 						{
@@ -635,7 +635,6 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 								socketSendString(sCmd, "226 ABOR command successful.\r\n");
 							}
 						}
-						Sleep(200);
 						socketUtility::closeSocket(sData);
 					} 
 					
@@ -679,10 +678,10 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 					}
 					dwRestOffset = 0;
 					sData = establishDataConnection(&saiData, &sPasv);
-                    if (sData) 
+					if (sData) 
                     {
-                        sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
-                        socketSendString(sCmd, szOutput);
+						sprintf(szOutput, "150 Opened %s mode data connection for \"%s\".\r\n", sPasv ? "passive" : "active", newVirtual);
+						socketSendString(sCmd, szOutput);
 						if (receiveSocketFile(sCmd, sData, fileHandle)) 
 						{
 							sprintf(szOutput, "226 \"%s\" transferred successfully.\r\n", newVirtual);
@@ -692,7 +691,6 @@ bool WINAPI ftpServer::connectionThread(uint64_t sCmd)
 						{
 							socketSendString(sCmd, "426 Connection closed; transfer aborted.\r\n");
 						}
-						Sleep(200);
 						socketUtility::closeSocket(sData);
 					} else {
 						socketSendString(sCmd, "425 Can't open data connection.\r\n");
@@ -1032,7 +1030,7 @@ bool ftpServer::init()
 
 	mMaxConnections = 20;
 	mCommandTimeout = 300;
-	mConnectTimeout = 60;
+	mConnectTimeout = 15;
 
 	socketUtility::createSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, sListen);
 
