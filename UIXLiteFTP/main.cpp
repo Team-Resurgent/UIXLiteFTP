@@ -17,10 +17,210 @@
 #include "ftpServer.h"
 #include "driveManager.h"
 #include "network.h"
+#include "downloadLatest.h"
+
+char* downloadStatusMsg = NULL;
+DWORD downloadStatusSetTime = 0;
+void clearDownloadStatus();
+
+
 
 #include <xgraphics.h>
 
 #define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ|D3DFVF_TEX1)
+typedef struct MenuEntry {
+    const char* label;
+    void (*action)();
+    struct MenuEntry* subMenu;
+    int subMenuSize;
+} MenuEntry;
+
+void enterSubMenu(MenuEntry* subMenu, int size);
+void goBack();
+
+MenuEntry* currentMenu = NULL;
+int currentMenuSize = 0;
+int mSelectedControl = 0;
+
+#define MAX_MENU_DEPTH 5
+MenuEntry* menuStack[MAX_MENU_DEPTH];
+int menuSizeStack[MAX_MENU_DEPTH];
+int menuDepth = 0;
+void enterSubMenu(MenuEntry* subMenu, int size) {
+    if (menuDepth < MAX_MENU_DEPTH) {
+        menuStack[menuDepth] = currentMenu;
+        menuSizeStack[menuDepth] = currentMenuSize;
+        menuDepth++;
+        currentMenu = subMenu;
+        currentMenuSize = size;
+        mSelectedControl = 0;
+    }
+}
+
+void goBack() {
+    if (menuDepth > 0) {
+        menuDepth--;
+        currentMenu = menuStack[menuDepth];
+        currentMenuSize = menuSizeStack[menuDepth];
+        mSelectedControl = 0;
+    }
+}
+void action_downloadUIX() {
+    downloadStatusMsg = strdup("Downloading UIX Lite...");
+    downloadStatusSetTime = GetTickCount();
+    bool success = downloadZip("/uix-lite/uix-lite-latest.zip", "HDD0-E:\\uix-lite-latest.zip");
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "Download successful!" : "Download failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+
+void action_downloadFonts() {
+    downloadStatusMsg = strdup("Downloading Fonts...");
+    downloadStatusSetTime = GetTickCount();
+    bool success = downloadZip("/uix-lite/uix-lite-fonts.zip", "HDD0-E:\\uix-lite-fonts.zip");
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "Fonts downloaded!" : "Download failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+
+void action_downloadAudio() {
+    downloadStatusMsg = strdup("Downloading Audio...");
+    downloadStatusSetTime = GetTickCount();
+    bool success = downloadZip("/uix-lite/uix-lite-audio.zip", "HDD0-E:\\uix-lite-audio.zip");
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "Audio downloaded!" : "Download failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+
+void action_refreshIcons();
+void action_installFromZip();
+void action_installFonts();
+void action_installAudio();
+void action_back() { goBack(); }
+void action_exit() { utils::ReturnToDashboard(); }
+
+
+MenuEntry submenu_downloads[] = {
+    { "Download UIX Lite", action_downloadUIX, NULL, 0 },
+    { "Download Fonts", action_downloadFonts, NULL, 0 },
+    { "Download Audio", action_downloadAudio, NULL, 0 },
+    { "Back", action_back, NULL, 0 }
+};
+
+MenuEntry submenu_installs[] = {
+    { "Install UIX Lite", action_installFromZip, NULL, 0 },
+    { "Install Fonts", action_installFonts, NULL, 0 },
+    { "Install Audio", action_installAudio, NULL, 0 },
+    { "Back", action_back, NULL, 0 }
+};
+MenuEntry submenu_manageUIX[] = {
+	{ "Refresh Icons", action_refreshIcons, NULL, 0 },
+    { "Downloads", NULL, submenu_downloads, sizeof(submenu_downloads) / sizeof(MenuEntry) },
+    { "Install", NULL, submenu_installs, sizeof(submenu_installs) / sizeof(MenuEntry) },
+    { "Back", action_back, NULL, 0 }
+};
+
+MenuEntry mainMenu[] = {
+    { "Manage UIX Lite", NULL, submenu_manageUIX, sizeof(submenu_manageUIX)/sizeof(MenuEntry) },
+    { "Return to Dashboard", action_exit, NULL, 0 }
+};
+// Quick implementation of CrunchBite's xunzip library
+#include "xunzip.h"
+
+void action_installFromZip() {
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup("Installing UIX...");
+    downloadStatusSetTime = GetTickCount();
+
+    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true);
+    
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "UIX installed to C:\\" : "Install failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+void action_installFonts() {
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup("Installing Fonts...");
+    downloadStatusSetTime = GetTickCount();
+
+    bool success = xExtractZip("HDD0-E:\\uix-lite-fonts.zip", "HDD0-C:\\", true, true);
+
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "Fonts installed to C:\\" : "Font install failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+
+void action_installAudio() {
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup("Installing Audio...");
+    downloadStatusSetTime = GetTickCount();
+
+    bool success = xExtractZip("HDD0-E:\\uix-lite-audio.zip", "HDD0-C:\\Audio\\", true, true);
+
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup(success ? "Audio installed to C:\\" : "Audio install failed.");
+    downloadStatusSetTime = GetTickCount();
+}
+#include "xbeParse.h"
+
+void scanForDefaultXBE(const char* basePath, FILE* out) {
+    WIN32_FIND_DATAA findData;
+    char searchPath[256];
+    sprintf(searchPath, "%s*", basePath);
+
+    HANDLE hFind = FindFirstFileA(searchPath, &findData);
+    if (hFind == INVALID_HANDLE_VALUE) return;
+
+    do {
+        if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0)
+            continue;
+
+        char fullPath[256];
+        sprintf(fullPath, "%s%s", basePath, findData.cFileName);
+
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            char nextPath[256];
+            sprintf(nextPath, "%s\\", fullPath);
+            scanForDefaultXBE(nextPath, out);
+        } else if (_stricmp(findData.cFileName, "default.xbe") == 0) {
+            uint32_t titleId = 0;
+            char titleName[41] = { 0 };
+
+            if (parseXBE(fullPath, titleName, &titleId)) {
+                fprintf(out, "%s=%08x\n", titleName, titleId);
+            }
+        }
+    } while (FindNextFileA(hFind, &findData));
+
+    FindClose(hFind);
+}
+
+void action_refreshIcons() {
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup("Refreshing icons...");
+    downloadStatusSetTime = GetTickCount();
+
+    FILE* out = fopen("HDD0-C:\\UIX Configs\\Icons.ini", "w");
+    if (!out) {
+        downloadStatusMsg = strdup("Failed to write Icons.ini");
+        return;
+    }
+
+    fprintf(out, "[default]\n");
+
+    const char* drives[] = { "HDD0-E:\\", "HDD0-F:\\", "HDD0-G:\\" };
+    for (int d = 0; d < 3; d++) {
+        scanForDefaultXBE(drives[d], out);
+    }
+
+    fclose(out);
+
+    if (downloadStatusMsg) free(downloadStatusMsg);
+    downloadStatusMsg = strdup("Icons refreshed!");
+    downloadStatusSetTime = GetTickCount();
+}
+
+
 
 typedef struct {
     DWORD dwWidth;
@@ -201,28 +401,40 @@ void render_sphere(float angle, utils::dataContainer* sphereMesh)
     context::getD3dDevice()->DrawPrimitiveUP(D3DPT_TRIANGLELIST, (sphereMesh->size / sizeof(meshUtility::vertex)) / 3, sphereMesh->data, sizeof(meshUtility::vertex));
 }
 
-void update_scene()
-{
-	// Select Actions
+void update_scene() {
+    if (inputManager::buttonPressed(ButtonA)) {
+        MenuEntry* entry = &currentMenu[mSelectedControl];
+        if (entry->subMenu != NULL) {
+            enterSubMenu(entry->subMenu, entry->subMenuSize);
+        } else if (entry->action != NULL) {
+            entry->action();
+            return;
+        }
+    }
 
-	if (inputManager::buttonPressed(ButtonA))
-	{
-		utils::ReturnToDashboard();
-		return;
-	}
+    if (inputManager::buttonPressed(ButtonDpadDown)) {
+        mSelectedControl = (mSelectedControl + 1) % currentMenuSize;
+    }
 
-	network::init();
+    if (inputManager::buttonPressed(ButtonDpadUp)) {
+        mSelectedControl = (mSelectedControl - 1 + currentMenuSize) % currentMenuSize;
+    }
+
+    clearDownloadStatus();
+    network::init();
 }
+
+
+
 
 void render_scene()
 {
     // Setup Ortho Camera 
-
     D3DXMATRIX matIdentity;
     D3DXMatrixIdentity(&matIdentity);
 
     D3DXMATRIX matProjection;
-	D3DXMatrixOrthoOffCenterLH(&matProjection, 0, (float)context::getBufferWidth(), 0, (float)context::getBufferHeight(), 1.0f, 800.0f);
+    D3DXMatrixOrthoOffCenterLH(&matProjection, 0, (float)context::getBufferWidth(), 0, (float)context::getBufferHeight(), 1.0f, 800.0f);
 
     context::getD3dDevice()->SetTransform(D3DTS_VIEW, &matIdentity);
     context::getD3dDevice()->SetTransform(D3DTS_WORLD, &matIdentity);
@@ -230,25 +442,60 @@ void render_scene()
     context::getD3dDevice()->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
     context::getD3dDevice()->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 
-    // Render Menu
+    // Render Menu Panel
+    component::panel(theme::getPanelFillColor(), theme::getPanelStrokeColor(), 16, 16, 688, 448);
 
-	component::panel(theme::getPanelFillColor(), theme::getPanelStrokeColor(), 16, 16, 688, 448);
-
-    int32_t yPos = (context::getBufferHeight() - (3 * 40) - 10) / 2;
+    int menuItemCount = currentMenuSize;
+    int32_t yPos = (context::getBufferHeight() - (menuItemCount * 40) - 10) / 2;
     yPos += theme::getCenterOffset();
 
-    drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), "Welcome to UIX Lite FTPd. Powered by PrometheOS.", theme::getFooterTextColor(), horizAlignmentCenter, 193, yPos, 322);
+    drawing::drawBitmapStringAligned(
+        context::getBitmapFontSmall(),
+        "Welcome to UIX Lite FTPd. Powered by PrometheOS.",
+        theme::getFooterTextColor(),
+        horizAlignmentCenter,
+        193,
+        yPos,
+        322
+    );
 
     yPos += 40;
 
-    component::button(true, false, "Return to Dashboard", 193, yPos, 322, 30);
+    for (int i = 0; i < menuItemCount; ++i) {
+        component::button(mSelectedControl == i, false, currentMenu[i].label, 193, yPos, 322, 30);
+        yPos += 40;
+    }
 
-	char* currentIp = context::getCurrentIp();
+    // Footer Info (IP + Status)
+    char* currentIp = context::getCurrentIp();
     char* ip = stringUtility::formatString("IP: %s - Username: xbox - Password: xbox", currentIp);
-	drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), ip, theme::getFooterTextColor(), horizAlignmentCenter, 193, theme::getFooterY(), 322);
-	free(ip);
-	free(currentIp);
+
+    if (downloadStatusMsg) {
+        drawing::drawBitmapStringAligned(
+            context::getBitmapFontSmall(),
+            downloadStatusMsg,
+            theme::getFooterTextColor(),
+            horizAlignmentCenter,
+            193,
+            theme::getFooterY() - 30,
+            322
+        );
+    }
+
+    drawing::drawBitmapStringAligned(
+        context::getBitmapFontSmall(),
+        ip,
+        theme::getFooterTextColor(),
+        horizAlignmentCenter,
+        193,
+        theme::getFooterY(),
+        322
+    );
+
+    free(ip);
+    free(currentIp);
 }
+
 
 void refreshInfo()
 {
@@ -274,6 +521,13 @@ void refreshInfo()
 		}
 	}
 }
+void clearDownloadStatus() {
+    if (downloadStatusMsg && GetTickCount() - downloadStatusSetTime > 4000) {
+        free(downloadStatusMsg);
+        downloadStatusMsg = NULL;
+    }
+}
+
 
 void __cdecl main()
 {
@@ -311,7 +565,9 @@ void __cdecl main()
 
     audioPlayer::init();
     audioPlayer::play();
-    
+    currentMenu = mainMenu;
+	currentMenuSize = sizeof(mainMenu) / sizeof(MenuEntry);
+
     float angle = 0;
     while (TRUE)
     {

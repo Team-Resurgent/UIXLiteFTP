@@ -1,5 +1,6 @@
 #include "socketUtility.h"
 #include "utils.h"
+#include <xonline.h>
 
 bool socketUtility::createSocket(int af, int type, int protocol, uint64_t& result)
 {
@@ -10,6 +11,17 @@ bool socketUtility::createSocket(int af, int type, int protocol, uint64_t& resul
 		return false;
 	}
 	return true;
+}
+bool socketUtility::resolveHostname(const char* hostname, IN_ADDR* addr)
+{
+    XNDNS* pDns = NULL;
+    if (XNetDnsLookup(hostname, NULL, &pDns) != 0 || !pDns || pDns->iStatus != 0) {
+        return false;
+    }
+
+    *addr = pDns->aina[0];
+    XNetDnsRelease(pDns);
+    return true;
 }
 
 uint64_t socketUtility::createSocket(sockaddr_in sockaddr_in, bool allow_reuse)

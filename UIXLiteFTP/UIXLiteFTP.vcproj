@@ -36,10 +36,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="xapilibd.lib d3d8d.lib d3dx8d.lib xgraphicsd.lib xonlined.lib dsoundd.lib xboxkrnl.lib"
+				AdditionalDependencies="xapilibd.lib d3d8d.lib d3dx8d.lib xgraphicsd.lib xonlined.lib dsoundd.lib xboxkrnl.lib xunzip.lib"
 				OutputFile="$(OutDir)/$(ProjectName).exe"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories=""
+				AdditionalLibraryDirectories="xunzip.h"
 				IgnoreDefaultLibraryNames=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/$(ProjectName).pdb"
@@ -99,7 +99,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="xapilib.lib d3d8.lib d3dx8.lib dsound.lib xgraphics.lib xonline.lib xboxkrnl.lib"
+				AdditionalDependencies="xapilib.lib d3d8.lib d3dx8.lib dsound.lib xgraphics.lib xonline.lib xboxkrnl.lib xunzip.lib"
 				OutputFile="$(OutDir)/$(ProjectName).exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="FALSE"
@@ -149,6 +149,9 @@
 			</File>
 			<File
 				RelativePath=".\context.cpp">
+			</File>
+			<File
+				RelativePath=".\downloadLatest.cpp">
 			</File>
 			<File
 				RelativePath=".\drawing.cpp">
@@ -201,6 +204,9 @@
 			<File
 				RelativePath=".\utils.cpp">
 			</File>
+			<File
+				RelativePath=".\xbeParse.cpp">
+			</File>
 			<Filter
 				Name="Threads"
 				Filter="">
@@ -224,6 +230,9 @@
 			</File>
 			<File
 				RelativePath=".\context.h">
+			</File>
+			<File
+				RelativePath=".\downloadLatest.h">
 			</File>
 			<File
 				RelativePath=".\drawing.h">
@@ -289,7 +298,13 @@
 				RelativePath=".\utils.h">
 			</File>
 			<File
+				RelativePath=".\xbeParse.h">
+			</File>
+			<File
 				RelativePath=".\xboxinternals.h">
+			</File>
+			<File
+				RelativePath=".\xunzip.h">
 			</File>
 			<Filter
 				Name="Assets"

@@ -29,8 +29,8 @@ public:
 	static bool closeSocket(uint64_t& socket);
 	static bool getSocketName(uint64_t socket, sockaddr_in* socket_addr_in);
 	static bool getSocketName(uint64_t socket, sockaddr* socket_addr);
-
-
+	static bool resolveHostname(const char* hostname, IN_ADDR* addr);
+	
 	static int getAvailableDataSize(const uint64_t socket);
 	static int receiveSocketData(uint64_t socket, char* buffer, int size);
 	static int sendSocketData(uint64_t socket, const char* buffer, int size);

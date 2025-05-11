@@ -57,7 +57,16 @@ void network::configure()
 
 	uint32_t* subnet = isXboxVersion2 ? &netConfigParams.V2_Subnetmask : &netConfigParams.V1_Subnetmask; 
 	uint32_t* gateway = isXboxVersion2 ? &netConfigParams.V2_Defaultgateway : &netConfigParams.V1_Defaultgateway; 
+	// Add DNS configuration
+	uint32_t* primaryDns = isXboxVersion2 ? &netConfigParams.V2_DNS1 : &netConfigParams.V1_DNS1;
+	uint32_t* secondaryDns = isXboxVersion2 ? &netConfigParams.V2_DNS2 : &netConfigParams.V1_DNS2;
 
+// Only set if not already configured (Might be redudant, have to ask EQ)
+if (*primaryDns == 0)
+	*primaryDns = inet_addr("8.8.8.8"); // Google DNS
+
+if (*secondaryDns == 0)
+	*secondaryDns = inet_addr("1.1.1.1"); // Cloudflare DNS
 	if (netConfigParams.Flag != flag)
 	{
 		netConfigParams.Flag = flag;
