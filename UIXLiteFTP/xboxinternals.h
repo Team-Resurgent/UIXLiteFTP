@@ -12,6 +12,7 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long uint32_t;
 typedef unsigned long long uint64_t;
+typedef void (*CallbackFunction)(void*);
 
 #define I2C_HDMI_ADDRESS1 0x88
 #define I2C_HDMI_ADDRESS2 0x86

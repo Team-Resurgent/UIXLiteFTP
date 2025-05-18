@@ -67,7 +67,7 @@
 				DontModifyHD="TRUE"
 				DontMountUD="TRUE"
 				NoLibWarn="TRUE"
-				TitleID="0x43423130"
+				TitleID=""
 				TitleName="UIXLiteFTP"
 				TitleImage=""
 				XBEVersion="1"/>
@@ -99,7 +99,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="xapilib.lib d3d8.lib d3dx8.lib dsound.lib xgraphics.lib xonline.lib xboxkrnl.lib"
+				AdditionalDependencies="xapilib.lib d3d8.lib d3dx8.lib dsound.lib xgraphics.lib xonline.lib xboxkrnl.lib xunzip.lib"
 				OutputFile="$(OutDir)/$(ProjectName).exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="FALSE"
@@ -129,6 +129,7 @@
 				LimitAvailableMemoryTo64MB="FALSE"
 				DontModifyHD="TRUE"
 				DontMountUD="TRUE"
+				TitleID="0x43423130"
 				TitleName="UIXLiteFTP"
 				TitleImage=""
 				XBEVersion="1"/>
@@ -166,6 +167,9 @@
 				RelativePath=".\ftpServer.cpp">
 			</File>
 			<File
+				RelativePath=".\IniUtility.cpp">
+			</File>
+			<File
 				RelativePath=".\inputManager.cpp">
 			</File>
 			<File
@@ -200,6 +204,9 @@
 			</File>
 			<File
 				RelativePath=".\utils.cpp">
+			</File>
+			<File
+				RelativePath=".\xbeParse.cpp">
 			</File>
 			<Filter
 				Name="Threads"
@@ -242,6 +249,9 @@
 			</File>
 			<File
 				RelativePath=".\ftpServer.h">
+			</File>
+			<File
+				RelativePath=".\IniUtility.h">
 			</File>
 			<File
 				RelativePath=".\inputManager.h">
@@ -289,7 +299,13 @@
 				RelativePath=".\utils.h">
 			</File>
 			<File
+				RelativePath=".\xbeParse.h">
+			</File>
+			<File
 				RelativePath=".\xboxinternals.h">
+			</File>
+			<File
+				RelativePath=".\xunzip.h">
 			</File>
 			<Filter
 				Name="Assets"
