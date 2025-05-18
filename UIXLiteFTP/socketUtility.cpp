@@ -240,6 +240,206 @@ bool socketUtility::getSocketName(uint64_t socket, sockaddr* socket_addr)
 	return true;
 }
 
+bool socketUtility::resolveHostname(const char* hostname, IN_ADDR* addr)
+{
+    XNDNS* pDns = NULL;
+    if (XNetDnsLookup(hostname, NULL, &pDns) != 0 || !pDns || pDns->iStatus != 0) {
+        return false;
+    }
+
+    *addr = pDns->aina[0];
+    XNetDnsRelease(pDns);
+    return true;
+}
+bool WINAPI socketUtility::downloadThread(LPVOID lParam)
+{
+	struct ThreadData
+	{
+		CallbackFunction callback;
+		const char* hostname;
+		const char* path;
+		const char* outputFile;
+	}* Params = reinterpret_cast<ThreadData*>(lParam);
+
+	WSAEVENT hEvent = WSACreateEvent();
+    XNDNS* pDns = NULL;
+
+    if (XNetDnsLookup(Params->hostname, hEvent, &pDns) != 0 || WaitForSingleObject(hEvent, 5000) != WAIT_OBJECT_0 || !pDns || pDns->iStatus != 0)
+    {
+        Params->callback("Unable to resolve the host.");
+		if (pDns) XNetDnsRelease(pDns);
+        delete Params;
+		return false;
+    }
+
+    IN_ADDR addr = pDns->aina[0];
+    XNetDnsRelease(pDns);
+
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock == INVALID_SOCKET) return false;
+
+    SOCKADDR_IN server = {};
+    server.sin_family = AF_INET;
+    server.sin_port = htons(80);
+    server.sin_addr = addr;
+
+    if (connect(sock, (SOCKADDR*)&server, sizeof(server)) == SOCKET_ERROR)
+    {
+        closesocket(sock);
+        Params->callback("Unable to connect to the host.");
+		delete Params;
+		return false;
+    }
+
+    char request[512];
+    sprintf(request,
+        "GET %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Connection: close\r\n\r\n",
+        Params->path, Params->hostname);
+
+    send(sock, request, strlen(request), 0);
+
+    const int BUFFER_SIZE = 4096;
+    char buffer[BUFFER_SIZE];
+	bool headersParsed = false;
+    int httpStatus = 0;
+	int contentLength = -1;
+		
+    FILE* file = fopen(Params->outputFile, "wb");
+    if (!file)
+    {
+        closesocket(sock);
+		Params->callback("Unable to create the destination file.");
+		delete Params;
+        return false;
+    }
+	int bytes, totalBytes;
+    while ((bytes = recv(sock, buffer, sizeof(buffer), 0)) > 0)
+    {
+		if (!headersParsed)
+        {
+			char* headerEnd = strstr(buffer, "\r\n\r\n");
+			char* contentLengthStr = strstr(buffer, "Content-Length:");
+			if (contentLengthStr)
+			{
+				contentLengthStr += strlen("Content-Length:");
+				while (*contentLengthStr == ' ' || *contentLengthStr == '\t') contentLengthStr++;
+				contentLength = atoi(contentLengthStr);
+			}
+            if (headerEnd)
+            {
+                char version[16] = {0};
+				if (sscanf(buffer, "HTTP/%15s %d", version, &httpStatus) != 2)
+				{
+					fclose(file);
+					remove(Params->outputFile);
+					closesocket(sock);
+					Params->callback("Invalid HTTP response from the host.");
+					delete Params;
+					return false;
+				}
+
+				// Map HTTP status code to a description
+				const char* statusDesc = "Unknown Status";
+				switch (httpStatus)
+				{
+					case 200: statusDesc = "OK"; break;
+					case 301: statusDesc = "Moved Permanently"; break;
+					case 302: statusDesc = "Found"; break;
+					case 400: statusDesc = "Bad Request"; break;
+					case 403: statusDesc = "Forbidden"; break;
+					case 404: statusDesc = "Not Found"; break;
+					case 500: statusDesc = "Internal Server Error"; break;
+					// Add more as needed
+				}
+
+				// log HTTP version, status, and description
+				char msg[256];
+				sprintf(msg, "HTTP version: %s, Status: %d (%s)", version, httpStatus, statusDesc);
+				Params->callback(msg);
+
+				if (httpStatus != 200)
+				{
+					fclose(file);
+					remove(Params->outputFile);
+					closesocket(sock);
+					delete Params;
+					return false;
+				}
+
+                // Write remainder after headers
+                int headerLen = headerEnd - buffer + 4;
+				totalBytes = bytes - headerLen;
+				char progress[64];
+				sprintf(progress, "Downloaded %dKB of %dKB", totalBytes / 1024, contentLength / 1024);
+				Params->callback(progress);
+                fwrite(headerEnd + 4, 1, headerLen, file);
+
+				headersParsed = true;
+            }
+        }
+        else
+        {
+			totalBytes += bytes;
+			char progress[64];
+			sprintf(progress, "Downloaded %dKB of %dKB", totalBytes / 1024, contentLength / 1024);
+			Params->callback(progress);
+			fwrite(buffer, 1, bytes, file);
+        }
+    }
+
+    if (bytes < 0)
+    {
+        fclose(file);
+        remove(Params->outputFile);
+        closesocket(sock);
+        Params->callback("Socket error during download.");
+        delete Params;
+        return false;
+    }
+
+    fclose(file);
+    closesocket(sock);
+	Params->callback("Download complete.");
+	delete Params;
+	return true;
+}
+
+bool socketUtility::downloadFile(const char* hostname, const char* path, const char* outputFile, CallbackFunction callback)
+{
+    struct ThreadData
+	{
+		CallbackFunction callback;
+		const char* hostname;
+		const char* path;
+		const char* outputFile;
+	};
+
+	ThreadData* Params = new ThreadData;
+	Params->callback = callback;
+	Params->hostname = hostname;
+	Params->path = path;
+	Params->outputFile = outputFile;
+
+	HANDLE hThread = CreateThread(
+		NULL,
+		0,
+		(LPTHREAD_START_ROUTINE)downloadThread,
+		(void*)Params,
+		0,
+		NULL
+	);
+
+	if (hThread != NULL) 
+	{
+		CloseHandle(hThread);
+		return true;
+	} else {
+		return false;
+	}
+}
+
 int socketUtility::getAvailableDataSize(const uint64_t socket)
 {
 	unsigned long available_data = 0;
