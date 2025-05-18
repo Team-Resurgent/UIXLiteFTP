@@ -139,7 +139,7 @@ MenuEntry mainMenu[] = {
 void action_installFromZip() {
     updateStatusMsg(strdup("Installing UIX..."),false);
 
-    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true);
+    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true, true);
     
     updateStatusMsg(strdup(success ? "UIX installed to C:\\" : "Install failed."),true);
 }
