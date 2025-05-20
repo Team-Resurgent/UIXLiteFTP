@@ -1,40 +1,53 @@
 #include "IniUtility.h"
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cstring>
-#include <algorithm>
+#include <stdio.h>
+#include <string.h>
 #include "pointerVector.h"
 
-using namespace std;
-
 namespace {
-    string trim(const string& str)
-	{
-        size_t first = str.find_first_not_of(" \t");
-        if (first == string::npos) return "";
-        size_t last = str.find_last_not_of(" \t");
-        return str.substr(first, last - first + 1);
+    char* trim(char* str)
+    {
+        if (str == NULL) return NULL;
+
+        // Trim leading spaces
+        char* start = str;
+        while (*start == ' ' || *start == '\t') start++;
+
+        // Trim trailing spaces
+        char* end = start + strlen(start) - 1;
+        while (end > start && (*end == ' ' || *end == '\t')) end--;
+        *(end + 1) = '\0';
+
+        return start;
     }
 
-    bool isSection(const string& line, string& sectionName)
-	{
-        if (!line.empty() && line[0] == '[' && line[line.length() - 1] == ']')
-		{
-            sectionName = line.substr(1, line.size() - 2);
-            return true;
+    bool isSection(char* line, char* sectionName)
+    {
+        if (line && line[0] == '[')
+        {
+            char* end = strchr(line, ']');
+            if (end)
+            {
+                strncpy(sectionName, line + 1, end - line - 1);
+                sectionName[end - line - 1] = '\0';
+                return true;
+            }
         }
         return false;
     }
 
-    bool isKeyValuePair(const string& line, string& key, string& value, bool& hasSpaces)
-	{
-        size_t equalPos = line.find('=');
-        if (equalPos != string::npos)
-		{
-            key = trim(line.substr(0, equalPos));
-            value = trim(line.substr(equalPos + 1));
-            hasSpaces = (line.find(" = ") != string::npos);
+    bool isKeyValuePair(char* line, char* key, char* value, bool& hasSpaces)
+    {
+        char* equalPos = strchr(line, '=');
+        if (equalPos)
+        {
+            strncpy(key, line, equalPos - line);
+            key[equalPos - line] = '\0';
+            strcpy(value, equalPos + 1);
+
+            // Check if spaces are around '='
+            hasSpaces = (strstr(line, " = ") != NULL);
+            trim(key);
+            trim(value);
             return true;
         }
         return false;
@@ -43,324 +56,429 @@ namespace {
 
 char* IniUtility::GetValue(const char* filename, const char* section, const char* key)
 {
-    ifstream file(filename);
-    if (!file)
-	{
-        return strdup("");
-    }
+    FILE* file = fopen(filename, "r");
+    if (!file) return strdup("");
 
-    string line, currentSection;
-    string keyStr = key;
+    char line[MAX_LINE_SIZE], currentSection[256];
+    char keyStr[256];
+    strcpy(keyStr, key);
     bool inGlobalSection = (section == NULL || strlen(section) == 0);
 
-    while (getline(file, line))
-	{
-        line = trim(line);
-        if (line.empty() || line[0] == ';') continue;
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
+        if (*trimmedLine == '\0' || *trimmedLine == ';') continue;
 
-        if (isSection(line, currentSection))
-		{
+        if (isSection(trimmedLine, currentSection))
+        {
             inGlobalSection = false;
-            if (currentSection == section)
-			{
+            if (strcmp(currentSection, section) == 0)
+            {
                 inGlobalSection = true;
             }
             continue;
         }
 
-        string foundKey, foundValue;
+        char foundKey[256], foundValue[MAX_VALUE_SIZE];
         bool hasSpaces;
-        if (isKeyValuePair(line, foundKey, foundValue, hasSpaces))
-		{
-            if ((inGlobalSection || currentSection == section) && foundKey == key)
-			{
-                char* result = new char[foundValue.length() + 1];
-                strcpy(result, foundValue.c_str());
+        if (isKeyValuePair(trimmedLine, foundKey, foundValue, hasSpaces))
+        {
+            if ((inGlobalSection || strcmp(currentSection, section) == 0) && strcmp(foundKey, key) == 0)
+            {
+                char* result = strdup(foundValue);
+                fclose(file);
                 return result;
             }
         }
     }
+    fclose(file);
     return strdup("");
 }
 
 bool IniUtility::SetValue(const char* filename, const char* section, const char* key, const char* value)
 {
-    ifstream file(filename);
-    if (!file.is_open())
-	{
+    FILE* file = fopen(filename, "r");
+    if (!file) return false;
+
+    FILE* tempFile = tmpfile();
+    if (!tempFile)
+    {
+        fclose(file);
         return false;
     }
 
-    ostringstream newContent;
-    string line, currentSection, previousSection;
-    string keyStr = key;
-    string valueStr = value;
+    char line[MAX_LINE_SIZE], currentSection[256], previousSection[256] = "";
+    char keyStr[256], valueStr[MAX_VALUE_SIZE];
+    strcpy(keyStr, key);
+    strcpy(valueStr, value);
     bool keyUpdated = false;
     bool inGlobalSection = true;
-	bool firstFormatDetected = false;
+    bool firstFormatDetected = false;
     bool useSpaces = false; // Determines if spaces should be used around '='
 
-    while (getline(file, line))
-	{
-        string trimmedLine = trim(line);
-        if (trimmedLine.empty() || trimmedLine[0] == ';')
-		{
-            newContent << line << "\n";
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
+        if (*trimmedLine == '\0' || *trimmedLine == ';')
+        {
+            fprintf(tempFile, "%s\n", line);
             continue;
         }
 
-        string foundKey, foundValue;
+        char foundKey[256], foundValue[MAX_VALUE_SIZE];
         bool lineHasSpaces;
         if (isSection(trimmedLine, currentSection))
-		{
-			if (!keyUpdated && previousSection == section) {
-				// Update the existing key-value pair
-                newContent << keyStr << (useSpaces ? " = " : "=") << valueStr << "\n";
+        {
+            if (!keyUpdated && strcmp(previousSection, section) == 0) {
+                fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
                 keyUpdated = true;
-			}
-			previousSection = currentSection;
-			newContent << line << "\n";
+            }
+            strcpy(previousSection, currentSection);
+            fprintf(tempFile, "%s\n", line);
             inGlobalSection = false;
             continue;
         }
 
         if (isKeyValuePair(trimmedLine, foundKey, foundValue, lineHasSpaces))
-		{
+        {
             if (!firstFormatDetected)
-			{
+            {
                 useSpaces = lineHasSpaces;
                 firstFormatDetected = true;
             }
 
-            if ((inGlobalSection || currentSection == section) && foundKey == keyStr)
-			{
-                // Update the existing key-value pair
-                newContent << keyStr << (useSpaces ? " = " : "=") << valueStr << "\n";
+            if ((inGlobalSection || strcmp(currentSection, section) == 0) && strcmp(foundKey, keyStr) == 0)
+            {
+                fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
                 keyUpdated = true;
                 continue;
             }
         }
 
-        newContent << line << "\n";
+        fprintf(tempFile, "%s\n", line);
     }
 
     if (!keyUpdated)
-	{
-        if (!inGlobalSection && currentSection != section)
-		{
-            newContent << "[" << section << "]\n";
+    {
+        if (!inGlobalSection && strcmp(currentSection, section) != 0)
+        {
+            fprintf(tempFile, "[%s]\n", section);
         }
-        newContent << keyStr << (useSpaces ? " = " : "=") << valueStr << "\n";
+        fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
     }
 
-    file.close();
+    fclose(file);
 
-    ofstream outFile(filename);
-    if (!outFile)
-	{
+    file = fopen(filename, "w");
+    if (!file)
+    {
+        fclose(tempFile);
         return false;
     }
-    outFile << newContent.str();
-    outFile.close();
+
+    // Copy temp file content to original file
+    rewind(tempFile);
+    while (fgets(line, sizeof(line), tempFile))
+    {
+        fprintf(file, "%s", line);
+    }
+
+    fclose(tempFile);
+    fclose(file);
 
     return true;
 }
 
 pointerVector<char*>* IniUtility::GetSectionNames(const char* filename)
 {
-    ifstream file(filename);
+    FILE* file = fopen(filename, "r");
     if (!file)
-	{
+    {
         return new pointerVector<char*>(false);
     }
 
-    string line;
+    char line[MAX_LINE_SIZE];
     pointerVector<char*>* sections = new pointerVector<char*>(false);
 
-    while (getline(file, line))
-	{
-        string sectionName;
+    while (fgets(line, sizeof(line), file))
+    {
+        char sectionName[256];
         if (isSection(trim(line), sectionName))
-		{
-            char* section = new char[sectionName.length() + 1];
-            strcpy(section, sectionName.c_str());
+        {
+            char* section = strdup(sectionName);
             sections->add(section);
         }
     }
 
-    file.close();
+    fclose(file);
     return sections;
 }
 
 pointerVector<char*>* IniUtility::GetSectionKeys(const char* filename, const char* section)
 {
-    ifstream file(filename);
+    FILE* file = fopen(filename, "r");
     if (!file)
-	{
+    {
         return new pointerVector<char*>(false);
     }
 
-    string line, currentSection;
+    char line[MAX_LINE_SIZE], currentSection[256];
     pointerVector<char*>* keys = new pointerVector<char*>(false);
-	bool inGlobalSection = (section == NULL || strlen(section) == 0);
+    bool inGlobalSection = (section == NULL || strlen(section) == 0);
 
-    while (getline(file, line))
-	{
-        string trimmedLine = trim(line);
-        if (trimmedLine.empty() || trimmedLine[0] == ';') continue;
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
+        if (*trimmedLine == '\0' || *trimmedLine == ';') continue;
 
         if (isSection(trimmedLine, currentSection))
-		{
+        {
             inGlobalSection = false;
-            if (currentSection == section)
-			{
+            if (strcmp(currentSection, section) == 0)
+            {
                 inGlobalSection = true;
             }
             continue;
         }
 
-        if (inGlobalSection || currentSection == section)
-		{
-            string key, value;
+        if (inGlobalSection || strcmp(currentSection, section) == 0)
+        {
+            char key[256], value[MAX_VALUE_SIZE];
             bool hasSpaces;
             if (isKeyValuePair(trimmedLine, key, value, hasSpaces))
-			{
-                char* keyCStr = new char[key.length() + 1];
-                strcpy(keyCStr, key.c_str());
+            {
+                char* keyCStr = strdup(key);
                 keys->add(keyCStr);
             }
         }
     }
 
-    file.close();
+    fclose(file);
     return keys;
 }
 
 bool IniUtility::DeleteKey(const char* filename, const char* section, const char* key)
 {
-    ifstream file(filename);
-    if (!file.is_open())
-	{
+    FILE* file = fopen(filename, "r");
+    if (!file)
+    {
         return false;
     }
 
-    ostringstream newContent;
-    string line, currentSection;
-    string keyStr = key;
+    FILE* tempFile = tmpfile();
+    if (!tempFile)
+    {
+        fclose(file);
+        return false;
+    }
+
+    char line[MAX_LINE_SIZE], currentSection[256];
     bool keyDeleted = false;
     bool inGlobalSection = (section == NULL || strlen(section) == 0);
 
-    while (getline(file, line))
-	{
-        string trimmedLine = trim(line);
-        if (trimmedLine.empty() || trimmedLine[0] == ';')
-		{
-            newContent << line << "\n";
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
+        if (*trimmedLine == '\0' || *trimmedLine == ';')
+        {
+            fprintf(tempFile, "%s\n", line);
             continue;
         }
 
-        string foundKey, foundValue;
+        char foundKey[256], foundValue[MAX_VALUE_SIZE];
         bool hasSpaces;
         if (isSection(trimmedLine, currentSection))
-		{
-            newContent << line << "\n";
+        {
+            fprintf(tempFile, "%s\n", line);
             inGlobalSection = false;
             continue;
         }
 
-        if ((inGlobalSection || currentSection == section) && isKeyValuePair(trimmedLine, foundKey, foundValue, hasSpaces))
-		{
-            if (foundKey == keyStr)
-			{
+        if ((inGlobalSection || strcmp(currentSection, section) == 0) && isKeyValuePair(trimmedLine, foundKey, foundValue, hasSpaces))
+        {
+            if (strcmp(foundKey, key) == 0)
+            {
                 keyDeleted = true;
-                continue;
+                continue; // Skip writing this line to delete the key
             }
         }
 
-        newContent << line << "\n";
+        fprintf(tempFile, "%s\n", line);
     }
 
-    file.close();
+    fclose(file);
 
     if (!keyDeleted)
-	{
+    {
+        fclose(tempFile);
         return false;
     }
 
-    ofstream outFile(filename);
-    if (!outFile)
-	{
+    file = fopen(filename, "w");
+    if (!file)
+    {
+        fclose(tempFile);
         return false;
     }
-    outFile << newContent.str();
-    outFile.close();
+
+    rewind(tempFile);
+    while (fgets(line, sizeof(line), tempFile))
+    {
+        fprintf(file, "%s", line);
+    }
+
+    fclose(tempFile);
+    fclose(file);
 
     return true;
 }
 
 bool IniUtility::DeleteSection(const char* filename, const char* section)
 {
-    ifstream file(filename);
-    if (!file.is_open())
-	{
+    FILE* file = fopen(filename, "r");
+    if (!file)
+    {
         return false;
     }
 
-    ostringstream newContent;
-    string line, currentSection;
+    FILE* tempFile = tmpfile();
+    if (!tempFile)
+    {
+        fclose(file);
+        return false;
+    }
+
+    char line[MAX_LINE_SIZE], currentSection[256];
     bool sectionDeleted = false;
     bool inTargetSection = false;
     bool deleteGlobal = (section == NULL || strlen(section) == 0);
 
-    while (getline(file, line))
-	{
-        string trimmedLine = trim(line);
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
 
-        if (trimmedLine.empty() || trimmedLine[0] == ';')
-		{
+        if (*trimmedLine == '\0' || *trimmedLine == ';')
+        {
             if (!inTargetSection)
-			{
-                newContent << line << "\n";
+            {
+                fprintf(tempFile, "%s\n", line);
             }
             continue;
         }
 
-        string sectionName;
+        char sectionName[256];
         if (isSection(trimmedLine, sectionName))
-		{
+        {
             if (inTargetSection || (deleteGlobal && !sectionDeleted))
-			{
+            {
                 inTargetSection = false;
                 sectionDeleted = true; // Mark global deletion complete
             }
-            if (!deleteGlobal && sectionName == section)
-			{
+            if (!deleteGlobal && strcmp(sectionName, section) == 0)
+            {
                 inTargetSection = true;
                 sectionDeleted = true;
-                continue;
+                continue; // Skip writing this section
             }
         }
 
         if (!inTargetSection && !(deleteGlobal && sectionDeleted))
-		{
-            newContent << line << "\n";
+        {
+            fprintf(tempFile, "%s\n", line);
         }
     }
 
-    file.close();
+    fclose(file);
 
     if (!sectionDeleted && !deleteGlobal)
-	{
+    {
+        fclose(tempFile);
         return false;
     }
 
-    ofstream outFile(filename);
-    if (!outFile)
-	{
+    file = fopen(filename, "w");
+    if (!file)
+    {
+        fclose(tempFile);
         return false;
     }
-    outFile << newContent.str();
-    outFile.close();
+
+    rewind(tempFile);
+    while (fgets(line, sizeof(line), tempFile))
+    {
+        fprintf(file, "%s", line);
+    }
+
+    fclose(tempFile);
+    fclose(file);
 
     return true;
+}
+
+pointerVector<char*>* IniUtility::GetSectionNames(const char* filename)
+{
+    FILE* file = fopen(filename, "r");
+    if (!file)
+    {
+        return new pointerVector<char*>(false);
+    }
+
+    char line[MAX_LINE_SIZE];
+    pointerVector<char*>* sections = new pointerVector<char*>(false);
+
+    while (fgets(line, sizeof(line), file))
+    {
+        char sectionName[256];
+        if (isSection(trim(line), sectionName))
+        {
+            char* section = strdup(sectionName);
+            sections->add(section);
+        }
+    }
+
+    fclose(file);
+    return sections;
+}
+
+pointerVector<char*>* IniUtility::GetSectionKeys(const char* filename, const char* section)
+{
+    FILE* file = fopen(filename, "r");
+    if (!file)
+    {
+        return new pointerVector<char*>(false);
+    }
+
+    char line[MAX_LINE_SIZE], currentSection[256];
+    pointerVector<char*>* keys = new pointerVector<char*>(false);
+    bool inGlobalSection = (section == NULL || strlen(section) == 0);
+
+    while (fgets(line, sizeof(line), file))
+    {
+        char* trimmedLine = trim(line);
+        if (*trimmedLine == '\0' || *trimmedLine == ';') continue;
+
+        if (isSection(trimmedLine, currentSection))
+        {
+            inGlobalSection = false;
+            if (strcmp(currentSection, section) == 0)
+            {
+                inGlobalSection = true;
+            }
+            continue;
+        }
+
+        if (inGlobalSection || strcmp(currentSection, section) == 0)
+        {
+            char key[256], value[MAX_VALUE_SIZE];
+            bool hasSpaces;
+            if (isKeyValuePair(trimmedLine, key, value, hasSpaces))
+            {
+                char* keyCStr = strdup(key);
+                keys->add(keyCStr);
+            }
+        }
+    }
+
+    fclose(file);
+    return keys;
 }

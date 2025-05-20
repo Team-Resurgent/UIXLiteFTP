@@ -3,24 +3,29 @@
 
 #include "pointerVector.h"
 
+// Maximum sizes for line and value buffers
+const int MAX_LINE_SIZE = 1280;
+const int MAX_VALUE_SIZE = 1024;
+
+// IniUtility class declaration
 class IniUtility {
 public:
-    // Returns the value for a given section and key
+    // Retrieves the value associated with a key in a specific section
     static char* GetValue(const char* filename, const char* section, const char* key);
 
-    // Sets the value for a given section and key
+    // Sets the value associated with a key in a specific section
     static bool SetValue(const char* filename, const char* section, const char* key, const char* value);
 
-    // Returns all section names
+    // Retrieves all section names in the INI file
     static pointerVector<char*>* GetSectionNames(const char* filename);
 
-    // Returns all key names in a section
+    // Retrieves all keys within a specific section
     static pointerVector<char*>* GetSectionKeys(const char* filename, const char* section);
 
-    // Deletes a specific key from a section
+    // Deletes a specific key in a section
     static bool DeleteKey(const char* filename, const char* section, const char* key);
 
-    // Deletes a section and all its keys
+    // Deletes a specific section
     static bool DeleteSection(const char* filename, const char* section);
 };
 
