@@ -67,7 +67,7 @@
 				DontModifyHD="TRUE"
 				DontMountUD="TRUE"
 				NoLibWarn="TRUE"
-				TitleID=""
+				TitleID="0x43423130"
 				TitleName="UIXLiteFTP"
 				TitleImage=""
 				XBEVersion="1"/>

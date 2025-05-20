@@ -30,10 +30,12 @@ bool msgAutoClear = false;
 bool indexed = false;
 DWORD StatusSetTime = 0;
 DWORD menuNavDelay = 0;
+HANDLE hThread = NULL;
 void updateStatusMsg(char* msg,bool autoClear);
 void clearStatusMsg();
 void DownloadCallback(char* StatusMsg);
 void refreshicons();
+bool isBusy(HANDLE hThread);
 
 typedef struct MenuEntry {
     const char* label;
@@ -81,6 +83,21 @@ void DownloadCallback(void* data) {
 	updateStatusMsg(msg,autoClear);
 }
 
+bool isBusy(HANDLE hThread){
+    DWORD exitCode;
+    if (hThread == NULL) return false;
+    if (GetExitCodeThread(hThread, &exitCode)){
+        if (exitCode == STILL_ACTIVE) {
+            return true;
+        } else {
+		    CloseHandle(hThread);
+            hThread = NULL;
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
 void enterSubMenu(MenuEntry* subMenu, int size) {
     if (menuDepth < MAX_MENU_DEPTH) {
         menuStack[menuDepth] = currentMenu;
@@ -93,18 +110,21 @@ void enterSubMenu(MenuEntry* subMenu, int size) {
 }
 
 void action_downloadUIX() {
+    if(isBusy(hThread)) return;
     updateStatusMsg(strdup("Downloading UIX Lite..."),false);
-	socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-latest.zip", "HDD0-E:\\uix-lite-latest.zip", DownloadCallback);
+	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-latest.zip", "HDD0-E:\\uix-lite-latest.zip", DownloadCallback);
 }
 
 void action_downloadFonts() {
+    if(isBusy(hThread)) return;
     updateStatusMsg(strdup("Downloading Fonts..."),false);
-    socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-fonts.zip", "HDD0-E:\\uix-lite-fonts.zip", DownloadCallback);
+    hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-fonts.zip", "HDD0-E:\\uix-lite-fonts.zip", DownloadCallback);
 }
 
 void action_downloadAudio() {
+    if(isBusy(hThread)) return;
     updateStatusMsg(strdup("Downloading Audio..."),false);
-	socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-audio.zip", "HDD0-E:\\uix-lite-audio.zip", DownloadCallback);
+	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-audio.zip", "HDD0-E:\\uix-lite-audio.zip", DownloadCallback);
 }
 
 void action_refreshIcons();
@@ -136,28 +156,36 @@ MenuEntry mainMenu[] = {
 };
 
 // Quick implementation of CrunchBite's xunzip library
-void action_installFromZip() {
-    updateStatusMsg(strdup("Installing UIX..."),false);
-
-    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true, true);
-    
+void installFromZip();
+void installFromZip(){
+    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true);
     updateStatusMsg(strdup(success ? "UIX installed to C:\\" : "Install failed."),true);
 }
-void action_installFonts() {
-    updateStatusMsg(strdup("Installing Fonts..."),false);
-
-
+void action_installFromZip() {
+    if (isBusy(hThread)) return; 
+    updateStatusMsg(strdup("Installing UIX..."),false);
+    hThread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)installFromZip, 0, 0, NULL);
+}
+void installFonts();
+void installFonts(){
     bool success = xExtractZip("HDD0-E:\\uix-lite-fonts.zip", "HDD0-C:\\", true, true);
-
     updateStatusMsg(strdup(success ? "Fonts installed to C:\\" : "Font install failed."),true);
 }
+void action_installFonts() {
+    if(isBusy(hThread)) return;
+    updateStatusMsg(strdup("Installing Fonts..."),false);
+    hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installFonts, 0, 0, NULL);
+}
 
-void action_installAudio() {
-    updateStatusMsg(strdup("Installing Audio..."),false);
-
+void installAudio();
+void installAudio(){
     bool success = xExtractZip("HDD0-E:\\uix-lite-audio.zip", "HDD0-C:\\Audio\\", true, true);
-
     updateStatusMsg(strdup(success ? "Audio installed to C:\\" : "Audio install failed."),true);
+}
+void action_installAudio() {
+    if(isBusy(hThread)) return;
+    updateStatusMsg(strdup("Installing Audio..."),false);
+    hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installAudio, 0, 0, NULL);
 }
 
 void scanForDefaultXBE(const char* basePath, FILE* out) {
@@ -222,7 +250,7 @@ void refreshIcons(){
 			}
 		}
 	}
-	
+    
 	pointerVector<char*>* drives = driveManager::getMountedDrives();
 	for (size_t d = 0; d < drives->count(); d++)
 	{
@@ -246,20 +274,9 @@ void refreshIcons(){
 }
 
 void action_refreshIcons() {
+    if (isBusy(hThread)) return;
 	updateStatusMsg(strdup(indexed ? "Refreshing icons..." : "Indexing the extended partitions..."),false);
-	HANDLE hThread = CreateThread(
-		NULL,
-		0,
-		(LPTHREAD_START_ROUTINE)refreshIcons,
-		0,
-		0,
-		NULL
-	);
-
-	if (hThread != NULL) 
-	{
-		CloseHandle(hThread);
-	}
+	hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)refreshIcons, 0, 0, NULL);
 }
 
 typedef struct {
@@ -427,7 +444,7 @@ void render_sphere(float angle, utils::dataContainer* sphereMesh)
     D3DXMATRIX matProjection;
     D3DXMatrixIdentity(&matProjection);
     D3DXMatrixPerspectiveFovLH(&matProjection, 45 * deg_to_rad, (float)context::getBufferWidth() / (float)context::getBufferHeight(), 0.1f, 100.0f);
-   
+    
     context::getD3dDevice()->SetTransform( D3DTS_WORLD, &matWorld);
     context::getD3dDevice()->SetTransform(D3DTS_VIEW, &matView);
     context::getD3dDevice()->SetTransform(D3DTS_PROJECTION, &matProjection);
@@ -473,6 +490,7 @@ void update_scene() {
         mSelectedControl = (mSelectedControl - 1 + currentMenuSize) % currentMenuSize;
     }
 
+    isBusy(hThread);
     clearStatusMsg();
     network::init();
 }
@@ -596,7 +614,7 @@ void __cdecl main()
 
 	driveManager::mountDrive("HDD0-C");
 	driveManager::mountDrive("HDD0-E");
-	
+    
 	context::setImageMap(new pointerMap<image*>(true));
 	theme::loadSkin();
 
