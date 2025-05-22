@@ -19,7 +19,7 @@
 #include "network.h"
 
 #include <xgraphics.h>
-#include "xbeParse.h"
+#include "xbeParser.h"
 #include "xunzip.h"
 #include "IniUtility.h"
 
@@ -214,9 +214,10 @@ void scanForDefaultXBE(const char* basePath, FILE* out) {
 
             if (Exists) {
                 uint32_t titleId = 0;
-				char titleName[41] = { 0 };
-
-				if (parseXBE(xbePath, titleName, &titleId)) {
+				char* titleName = NULL;
+                XBEParser parser;
+                parser.LoadXBE(xbePath);
+				if (parser.GetTitleName(titleName) && parser.GetTitleID(titleId)) {
 					fprintf(out, "%s=%08x\n", findFileData.cFileName, titleId);
 					if (strlen(IniUtility::GetValue("HDD0-C:\\UIX Configs\\TitleNames.ini", "default", findFileData.cFileName)) == 0) {
 						IniUtility::SetValue("HDD0-C:\\UIX Configs\\TitleNames.ini","default",findFileData.cFileName,titleName);
