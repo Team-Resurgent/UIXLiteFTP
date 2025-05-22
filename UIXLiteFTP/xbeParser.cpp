@@ -167,7 +167,7 @@ bool XBEParser::GetTitleName(char*& titlename) {
     return true;
 }
 
-bool XBEParser::GetTitleImage(uint8_t*& image_data) {
+bool XBEParser::GetTitleImage(uint8_t*& image_data, size_t& image_size) {
     if (!filepath) {
         return false;  // Ensure LoadXBE was successful
     }
@@ -194,7 +194,10 @@ bool XBEParser::GetTitleImage(uint8_t*& image_data) {
     if (!image_data) {
         return false; // Allocation failed
     }
-	
+
+    // Set the returned image size
+	image_size = section.raw_size;
+    
 	FILE* file = fopen(filepath, "rb");
     if (!file) {
 		delete[] image_data;
@@ -215,4 +218,29 @@ bool XBEParser::GetTitleImage(uint8_t*& image_data) {
 
     fclose(file);
     return true;
+}
+
+bool XBEParser::SaveTitleImage(const char* path) {
+    uint8_t* image_data = NULL;
+    size_t image_size = 0;
+
+    if (!GetTitleImage(image_data, image_size)) {
+        return false;
+    }
+
+    if (!path || !image_data || image_size == 0) {
+        delete[] image_data;
+        return false;
+    }
+
+    FILE* file = fopen(path, "wb");
+    if (!file) {
+        delete[] image_data;
+        return false;
+    }
+
+    size_t written = fwrite(image_data, 1, image_size, file);
+    fclose(file);
+    delete[] image_data;
+    return written == image_size;
 }

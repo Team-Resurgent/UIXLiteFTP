@@ -89,7 +89,8 @@ public:
     bool LoadXBE(const char* filepath);
     bool GetTitleID(uint32_t& title_id);
     bool GetTitleName(char*& title);           // Allocates memory. Caller must free with delete[].
-    bool GetTitleImage(uint8_t*& image_data);  // Allocates memory. Caller must free with delete[].
+    bool GetTitleImage(uint8_t*& image_data, size_t& image_size);  // Allocates memory. Caller must free with delete[].
+    bool SaveTitleImage(const char* path);
 
 private:
     XBE_HEADER header;
@@ -102,9 +103,6 @@ private:
     pointerVector<XBE_SECTION*> sections;
 
     // Helper methods for reading and processing the XBE
-    bool ReadXBE();
-    bool ReadCertificate();
-    bool ReadSections();
     bool GetSectionByName(const char* name, XBE_SECTION& section);
 
     // Helper functions to calculate the offset within the file and do some cleanup
