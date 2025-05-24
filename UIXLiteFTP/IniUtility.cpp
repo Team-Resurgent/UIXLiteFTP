@@ -10,11 +10,11 @@ namespace {
 
         // Trim leading spaces
         char* start = str;
-        while (*start == ' ' || *start == '\t') start++;
+        while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n') start++;
 
         // Trim trailing spaces
         char* end = start + strlen(start) - 1;
-        while (end > start && (*end == ' ' || *end == '\t' || *end == '\n')) end--;
+        while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) end--;
         *(end + 1) = '\0';
 
         return start;
@@ -135,7 +135,7 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
     bool inGlobalSection = true;
     bool firstFormatDetected = false;
     bool useSpaces = false; // Determines if spaces should be used around '='
-    char* currentLine = strtok(fileContent, "\n");
+    char* currentLine = strtok(fileContent, "\r\n");
 	
     while (currentLine)
     {
@@ -146,8 +146,8 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
         if (*trimmedLine == '\0' || *trimmedLine == ';')
         {
             strcat(newContent, line);
-            strcat(newContent, "\n");
-            currentLine = strtok(NULL, "\n");
+            strcat(newContent, "\r\n");
+            currentLine = strtok(NULL, "\r\n");
             continue;
         }
 
@@ -160,14 +160,14 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
                 strcat(newContent, keyStr);
                 strcat(newContent, useSpaces ? " = " : "=");
                 strcat(newContent, valueStr);
-                strcat(newContent, "\n");
+                strcat(newContent, "\r\n");
                 keyUpdated = true;
             }
             strcpy(previousSection, currentSection);
             strcat(newContent, line);
-            strcat(newContent, "\n");
+            strcat(newContent, "\r\n");
             inGlobalSection = false;
-            currentLine = strtok(NULL, "\n");
+            currentLine = strtok(NULL, "\r\n");
             continue;
         }
 
@@ -184,16 +184,16 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
                 strcat(newContent, keyStr);
                 strcat(newContent, useSpaces ? " = " : "=");
                 strcat(newContent, valueStr);
-                strcat(newContent, "\n");
+                strcat(newContent, "\r\n");
                 keyUpdated = true;
-                currentLine = strtok(NULL, "\n");
+                currentLine = strtok(NULL, "\r\n");
                 continue;
             }
         }
 
         strcat(newContent, line);
-        strcat(newContent, "\n");
-        currentLine = strtok(NULL, "\n");
+        strcat(newContent, "\r\n");
+        currentLine = strtok(NULL, "\r\n");
     }
     if (!keyUpdated)
     {
@@ -203,12 +203,12 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
         {
             strcat(newContent, "[");
             strcat(newContent, section);
-            strcat(newContent, "]\n");
+            strcat(newContent, "]\r\n");
         }
         strcat(newContent, keyStr);
         strcat(newContent, useSpaces ? " = " : "=");
         strcat(newContent, valueStr);
-        strcat(newContent, "\n");
+        strcat(newContent, "\r\n");
     }
 
     // Open the file again for writing
@@ -338,7 +338,7 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
     bool keyDeleted = false;
     bool inGlobalSection = isNullOrEmpty(section);
 
-    char* currentLine = strtok(fileContent, "\n");
+    char* currentLine = strtok(fileContent, "\r\n");
     while (currentLine)
     {
         strncpy(line, currentLine, sizeof(line) - 1);
@@ -348,8 +348,8 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
         if (*trimmedLine == '\0' || *trimmedLine == ';')
         {
             strcat(newContent, line);
-            strcat(newContent, "\n");
-            currentLine = strtok(NULL, "\n");
+            strcat(newContent, "\r\n");
+            currentLine = strtok(NULL, "\r\n");
             continue;
         }
 
@@ -358,9 +358,9 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
         if (isSection(trimmedLine, currentSection))
         {
             strcat(newContent, line);
-            strcat(newContent, "\n");
+            strcat(newContent, "\r\n");
             inGlobalSection = false;
-            currentLine = strtok(NULL, "\n");
+            currentLine = strtok(NULL, "\r\n");
             continue;
         }
 
@@ -369,14 +369,14 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
             if (strcmp(foundKey, key) == 0)
             {
                 keyDeleted = true;
-                currentLine = strtok(NULL, "\n");
+                currentLine = strtok(NULL, "\r\n");
                 continue; // Skip writing this line to delete the key
             }
         }
 
         strcat(newContent, line);
-        strcat(newContent, "\n");
-        currentLine = strtok(NULL, "\n");
+        strcat(newContent, "\r\n");
+        currentLine = strtok(NULL, "\r\n");
     }
 
     if (!keyDeleted)
@@ -446,7 +446,7 @@ bool IniUtility::DeleteSection(const char* filename, const char* section)
     bool inTargetSection = false;
     bool deleteGlobal = isNullOrEmpty(section);
 
-    char* currentLine = strtok(fileContent, "\n");
+    char* currentLine = strtok(fileContent, "\r\n");
     while (currentLine)
     {
         strncpy(line, currentLine, sizeof(line) - 1);
@@ -458,9 +458,9 @@ bool IniUtility::DeleteSection(const char* filename, const char* section)
             if (!inTargetSection)
             {
                 strcat(newContent, line);
-                strcat(newContent, "\n");
+                strcat(newContent, "\r\n");
             }
-            currentLine = strtok(NULL, "\n");
+            currentLine = strtok(NULL, "\r\n");
             continue;
         }
 
@@ -476,7 +476,7 @@ bool IniUtility::DeleteSection(const char* filename, const char* section)
             {
                 inTargetSection = true;
                 sectionDeleted = true;
-                currentLine = strtok(NULL, "\n");
+                currentLine = strtok(NULL, "\r\n");
                 continue; // Skip writing this section
             }
         }
@@ -484,9 +484,9 @@ bool IniUtility::DeleteSection(const char* filename, const char* section)
         if (!inTargetSection)
         {
             strcat(newContent, line);
-            strcat(newContent, "\n");
+            strcat(newContent, "\r\n");
         }
-        currentLine = strtok(NULL, "\n");
+        currentLine = strtok(NULL, "\r\n");
     }
 
     if (!sectionDeleted && !deleteGlobal)
