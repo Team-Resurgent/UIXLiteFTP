@@ -14,7 +14,7 @@ namespace {
 
         // Trim trailing spaces
         char* end = start + strlen(start) - 1;
-        while (end > start && (*end == ' ' || *end == '\t')) end--;
+        while (end > start && (*end == ' ' || *end == '\t' || *end == '\n')) end--;
         *(end + 1) = '\0';
 
         return start;
@@ -62,7 +62,7 @@ char* IniUtility::GetValue(const char* filename, const char* section, const char
     char line[MAX_LINE_SIZE], currentSection[256];
     char keyStr[256];
     strcpy(keyStr, key);
-    bool inGlobalSection = (section == NULL || strlen(section) == 0);
+    bool inGlobalSection = isNullOrEmpty(section);
 
     while (fgets(line, sizeof(line), file))
     {
@@ -97,15 +97,35 @@ char* IniUtility::GetValue(const char* filename, const char* section, const char
 
 bool IniUtility::SetValue(const char* filename, const char* section, const char* key, const char* value)
 {
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if (!file) return false;
 
-    FILE* tempFile = tmpfile();
-    if (!tempFile)
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate memory to read the entire file
+    char* fileContent = new char[fileSize + 1]; // +1 for null terminator
+    if (!fileContent)
     {
         fclose(file);
         return false;
     }
+
+    // Read the entire file into memory
+    fread(fileContent, 1, fileSize, file);
+    fileContent[fileSize] = '\0'; // Null terminate the string
+    fclose(file);
+
+    // Prepare buffer for the new content
+    char* newContent = new char[fileSize + 1280]; // Allocate some extra space for new content
+    if (!newContent)
+    {
+        delete[] fileContent;
+        return false;
+    }
+    newContent[0] = '\0'; // Start with an empty string
 
     char line[MAX_LINE_SIZE], currentSection[256], previousSection[256] = "";
     char keyStr[256], valueStr[MAX_VALUE_SIZE];
@@ -115,13 +135,19 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
     bool inGlobalSection = true;
     bool firstFormatDetected = false;
     bool useSpaces = false; // Determines if spaces should be used around '='
-
-    while (fgets(line, sizeof(line), file))
+    char* currentLine = strtok(fileContent, "\n");
+	
+    while (currentLine)
     {
+        strncpy(line, currentLine, sizeof(line) - 1);
+        line[sizeof(line) - 1] = '\0'; // Ensure null-termination
         char* trimmedLine = trim(line);
+
         if (*trimmedLine == '\0' || *trimmedLine == ';')
         {
-            fprintf(tempFile, "%s\n", line);
+            strcat(newContent, line);
+            strcat(newContent, "\n");
+            currentLine = strtok(NULL, "\n");
             continue;
         }
 
@@ -129,13 +155,19 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
         bool lineHasSpaces;
         if (isSection(trimmedLine, currentSection))
         {
-            if (!keyUpdated && strcmp(previousSection, section) == 0) {
-                fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
+            if (!keyUpdated && strcmp(previousSection, section) == 0)
+            {
+                strcat(newContent, keyStr);
+                strcat(newContent, useSpaces ? " = " : "=");
+                strcat(newContent, valueStr);
+                strcat(newContent, "\n");
                 keyUpdated = true;
             }
             strcpy(previousSection, currentSection);
-            fprintf(tempFile, "%s\n", line);
+            strcat(newContent, line);
+            strcat(newContent, "\n");
             inGlobalSection = false;
+            currentLine = strtok(NULL, "\n");
             continue;
         }
 
@@ -149,42 +181,52 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
 
             if ((inGlobalSection || strcmp(currentSection, section) == 0) && strcmp(foundKey, keyStr) == 0)
             {
-                fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
+                strcat(newContent, keyStr);
+                strcat(newContent, useSpaces ? " = " : "=");
+                strcat(newContent, valueStr);
+                strcat(newContent, "\n");
                 keyUpdated = true;
+                currentLine = strtok(NULL, "\n");
                 continue;
             }
         }
 
-        fprintf(tempFile, "%s\n", line);
+        strcat(newContent, line);
+        strcat(newContent, "\n");
+        currentLine = strtok(NULL, "\n");
     }
-
     if (!keyUpdated)
     {
-        if (!inGlobalSection && strcmp(currentSection, section) != 0)
+        // Add the new section and key-value if it wasn't found and updated
+        if ((!inGlobalSection && strcmp(currentSection, section) != 0) 
+			|| (inGlobalSection && !isNullOrEmpty(section)))
         {
-            fprintf(tempFile, "[%s]\n", section);
+            strcat(newContent, "[");
+            strcat(newContent, section);
+            strcat(newContent, "]\n");
         }
-        fprintf(tempFile, "%s%s%s\n", keyStr, useSpaces ? " = " : "=", valueStr);
+        strcat(newContent, keyStr);
+        strcat(newContent, useSpaces ? " = " : "=");
+        strcat(newContent, valueStr);
+        strcat(newContent, "\n");
     }
 
-    fclose(file);
-
-    file = fopen(filename, "w");
+    // Open the file again for writing
+    file = fopen(filename, "wb");
     if (!file)
     {
-        fclose(tempFile);
+        delete[] fileContent;
+        delete[] newContent;
         return false;
     }
 
-    // Copy temp file content to original file
-    rewind(tempFile);
-    while (fgets(line, sizeof(line), tempFile))
-    {
-        fprintf(file, "%s", line);
-    }
+    // Write the updated content to the file
+    fwrite(newContent, sizeof(char), strlen(newContent), file);
 
-    fclose(tempFile);
+    // Clean up
     fclose(file);
+    delete[] fileContent;
+    delete[] newContent;
 
     return true;
 }
@@ -224,7 +266,7 @@ pointerVector<char*>* IniUtility::GetSectionKeys(const char* filename, const cha
 
     char line[MAX_LINE_SIZE], currentSection[256];
     pointerVector<char*>* keys = new pointerVector<char*>(false);
-    bool inGlobalSection = (section == NULL || strlen(section) == 0);
+    bool inGlobalSection = isNullOrEmpty(section);
 
     while (fgets(line, sizeof(line), file))
     {
@@ -259,29 +301,55 @@ pointerVector<char*>* IniUtility::GetSectionKeys(const char* filename, const cha
 
 bool IniUtility::DeleteKey(const char* filename, const char* section, const char* key)
 {
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if (!file)
     {
         return false;
     }
 
-    FILE* tempFile = tmpfile();
-    if (!tempFile)
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate memory to read the entire file
+    char* fileContent = new char[fileSize + 1];
+    if (!fileContent)
     {
         fclose(file);
         return false;
     }
 
+    // Read the entire file into memory
+    fread(fileContent, 1, fileSize, file);
+    fileContent[fileSize] = '\0'; // Null terminate the string
+    fclose(file);
+
+    // Prepare buffer for the new content
+    char* newContent = new char[fileSize + 1];
+    if (!newContent)
+    {
+        delete[] fileContent;
+        return false;
+    }
+    newContent[0] = '\0'; // Start with an empty string
+
     char line[MAX_LINE_SIZE], currentSection[256];
     bool keyDeleted = false;
-    bool inGlobalSection = (section == NULL || strlen(section) == 0);
+    bool inGlobalSection = isNullOrEmpty(section);
 
-    while (fgets(line, sizeof(line), file))
+    char* currentLine = strtok(fileContent, "\n");
+    while (currentLine)
     {
+        strncpy(line, currentLine, sizeof(line) - 1);
+        line[sizeof(line) - 1] = '\0'; // Ensure null-termination
         char* trimmedLine = trim(line);
+
         if (*trimmedLine == '\0' || *trimmedLine == ';')
         {
-            fprintf(tempFile, "%s\n", line);
+            strcat(newContent, line);
+            strcat(newContent, "\n");
+            currentLine = strtok(NULL, "\n");
             continue;
         }
 
@@ -289,8 +357,10 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
         bool hasSpaces;
         if (isSection(trimmedLine, currentSection))
         {
-            fprintf(tempFile, "%s\n", line);
+            strcat(newContent, line);
+            strcat(newContent, "\n");
             inGlobalSection = false;
+            currentLine = strtok(NULL, "\n");
             continue;
         }
 
@@ -299,186 +369,149 @@ bool IniUtility::DeleteKey(const char* filename, const char* section, const char
             if (strcmp(foundKey, key) == 0)
             {
                 keyDeleted = true;
+                currentLine = strtok(NULL, "\n");
                 continue; // Skip writing this line to delete the key
             }
         }
 
-        fprintf(tempFile, "%s\n", line);
+        strcat(newContent, line);
+        strcat(newContent, "\n");
+        currentLine = strtok(NULL, "\n");
     }
-
-    fclose(file);
 
     if (!keyDeleted)
     {
-        fclose(tempFile);
+        delete[] fileContent;
+        delete[] newContent;
         return false;
     }
 
-    file = fopen(filename, "w");
+    // Open the file again for writing
+    file = fopen(filename, "wb");
     if (!file)
     {
-        fclose(tempFile);
+        delete[] fileContent;
+        delete[] newContent;
         return false;
     }
 
-    rewind(tempFile);
-    while (fgets(line, sizeof(line), tempFile))
-    {
-        fprintf(file, "%s", line);
-    }
+    // Write the updated content to the file
+    fwrite(newContent, sizeof(char), strlen(newContent), file);
 
-    fclose(tempFile);
+    // Clean up
     fclose(file);
+    delete[] fileContent;
+    delete[] newContent;
 
     return true;
 }
 
 bool IniUtility::DeleteSection(const char* filename, const char* section)
 {
-    FILE* file = fopen(filename, "r");
+    FILE* file = fopen(filename, "rb");
     if (!file)
     {
         return false;
     }
 
-    FILE* tempFile = tmpfile();
-    if (!tempFile)
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate memory to read the entire file
+    char* fileContent = new char[fileSize + 1];
+    if (!fileContent)
     {
         fclose(file);
         return false;
     }
 
+    // Read the entire file into memory
+    fread(fileContent, 1, fileSize, file);
+    fileContent[fileSize] = '\0'; // Null terminate the string
+    fclose(file);
+
+    // Prepare buffer for the new content
+    char* newContent = new char[fileSize + 1];
+    if (!newContent)
+    {
+        delete[] fileContent;
+        return false;
+    }
+    newContent[0] = '\0'; // Start with an empty string
+
     char line[MAX_LINE_SIZE], currentSection[256];
     bool sectionDeleted = false;
     bool inTargetSection = false;
-    bool deleteGlobal = (section == NULL || strlen(section) == 0);
+    bool deleteGlobal = isNullOrEmpty(section);
 
-    while (fgets(line, sizeof(line), file))
+    char* currentLine = strtok(fileContent, "\n");
+    while (currentLine)
     {
+        strncpy(line, currentLine, sizeof(line) - 1);
+        line[sizeof(line) - 1] = '\0'; // Ensure null-termination
         char* trimmedLine = trim(line);
 
         if (*trimmedLine == '\0' || *trimmedLine == ';')
         {
             if (!inTargetSection)
             {
-                fprintf(tempFile, "%s\n", line);
+                strcat(newContent, line);
+                strcat(newContent, "\n");
             }
+            currentLine = strtok(NULL, "\n");
             continue;
         }
 
         char sectionName[256];
         if (isSection(trimmedLine, sectionName))
         {
-            if (inTargetSection || (deleteGlobal && !sectionDeleted))
+            if (inTargetSection)
             {
                 inTargetSection = false;
-                sectionDeleted = true; // Mark global deletion complete
+                sectionDeleted = true; // Mark section deletion complete
             }
             if (!deleteGlobal && strcmp(sectionName, section) == 0)
             {
                 inTargetSection = true;
                 sectionDeleted = true;
+                currentLine = strtok(NULL, "\n");
                 continue; // Skip writing this section
             }
         }
 
-        if (!inTargetSection && !(deleteGlobal && sectionDeleted))
+        if (!inTargetSection)
         {
-            fprintf(tempFile, "%s\n", line);
+            strcat(newContent, line);
+            strcat(newContent, "\n");
         }
+        currentLine = strtok(NULL, "\n");
     }
-
-    fclose(file);
 
     if (!sectionDeleted && !deleteGlobal)
     {
-        fclose(tempFile);
+        delete[] fileContent;
+        delete[] newContent;
         return false;
     }
 
-    file = fopen(filename, "w");
+    // Open the file again for writing
+    file = fopen(filename, "wb");
     if (!file)
     {
-        fclose(tempFile);
+        delete[] fileContent;
+        delete[] newContent;
         return false;
     }
 
-    rewind(tempFile);
-    while (fgets(line, sizeof(line), tempFile))
-    {
-        fprintf(file, "%s", line);
-    }
+    // Write the updated content to the file
+    fwrite(newContent, sizeof(char), strlen(newContent), file);
 
-    fclose(tempFile);
+    // Clean up
     fclose(file);
+    delete[] fileContent;
+    delete[] newContent;
 
     return true;
-}
-
-pointerVector<char*>* IniUtility::GetSectionNames(const char* filename)
-{
-    FILE* file = fopen(filename, "r");
-    if (!file)
-    {
-        return new pointerVector<char*>(false);
-    }
-
-    char line[MAX_LINE_SIZE];
-    pointerVector<char*>* sections = new pointerVector<char*>(false);
-
-    while (fgets(line, sizeof(line), file))
-    {
-        char sectionName[256];
-        if (isSection(trim(line), sectionName))
-        {
-            char* section = strdup(sectionName);
-            sections->add(section);
-        }
-    }
-
-    fclose(file);
-    return sections;
-}
-
-pointerVector<char*>* IniUtility::GetSectionKeys(const char* filename, const char* section)
-{
-    FILE* file = fopen(filename, "r");
-    if (!file)
-    {
-        return new pointerVector<char*>(false);
-    }
-
-    char line[MAX_LINE_SIZE], currentSection[256];
-    pointerVector<char*>* keys = new pointerVector<char*>(false);
-    bool inGlobalSection = (section == NULL || strlen(section) == 0);
-
-    while (fgets(line, sizeof(line), file))
-    {
-        char* trimmedLine = trim(line);
-        if (*trimmedLine == '\0' || *trimmedLine == ';') continue;
-
-        if (isSection(trimmedLine, currentSection))
-        {
-            inGlobalSection = false;
-            if (strcmp(currentSection, section) == 0)
-            {
-                inGlobalSection = true;
-            }
-            continue;
-        }
-
-        if (inGlobalSection || strcmp(currentSection, section) == 0)
-        {
-            char key[256], value[MAX_VALUE_SIZE];
-            bool hasSpaces;
-            if (isKeyValuePair(trimmedLine, key, value, hasSpaces))
-            {
-                char* keyCStr = strdup(key);
-                keys->add(keyCStr);
-            }
-        }
-    }
-
-    fclose(file);
-    return keys;
 }

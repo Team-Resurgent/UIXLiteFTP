@@ -2,6 +2,7 @@
 #define INIUTILITY_H
 
 #include "pointerVector.h"
+#include <cstring>
 
 // Maximum sizes for line and value buffers
 const int MAX_LINE_SIZE = 1280;
@@ -27,6 +28,12 @@ public:
 
     // Deletes a specific section
     static bool DeleteSection(const char* filename, const char* section);
+
+private:
+	// Helpers
+	static bool isNullOrEmpty(const char* strParam) {
+		return (strParam == NULL || strcmp(strParam, "") == 0);
+    }
 };
 
 #endif // INIUTILITY_H
