@@ -167,6 +167,11 @@ bool XBEParser::GetTitleName(char*& titlename) {
     return true;
 }
 
+bool XBEParser::HasTitleImage(){
+    XBE_SECTION section = {0};
+    return GetSectionByName("$$XTIMAGE", section);
+}
+
 bool XBEParser::GetTitleImage(uint8_t*& image_data, size_t& image_size) {
     if (!filepath) {
         return false;  // Ensure LoadXBE was successful
