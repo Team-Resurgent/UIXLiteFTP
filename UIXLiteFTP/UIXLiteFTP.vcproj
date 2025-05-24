@@ -206,7 +206,7 @@
 				RelativePath=".\utils.cpp">
 			</File>
 			<File
-				RelativePath=".\xbeParse.cpp">
+				RelativePath=".\xbeParser.cpp">
 			</File>
 			<Filter
 				Name="Threads"
@@ -299,7 +299,7 @@
 				RelativePath=".\utils.h">
 			</File>
 			<File
-				RelativePath=".\xbeParse.h">
+				RelativePath=".\xbeParser.h">
 			</File>
 			<File
 				RelativePath=".\xboxinternals.h">

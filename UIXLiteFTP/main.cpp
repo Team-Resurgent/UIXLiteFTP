@@ -35,7 +35,7 @@ void updateStatusMsg(char* msg,bool autoClear);
 void clearStatusMsg();
 void DownloadCallback(char* StatusMsg);
 void refreshicons();
-bool isBusy(HANDLE hThread);
+bool isBusy(HANDLE* hThreadPtr);
 
 typedef struct MenuEntry {
     const char* label;
@@ -83,15 +83,15 @@ void DownloadCallback(void* data) {
 	updateStatusMsg(msg,autoClear);
 }
 
-bool isBusy(HANDLE hThread){
+bool isBusy(HANDLE* hThreadPtr){
     DWORD exitCode;
-    if (hThread == NULL) return false;
-    if (GetExitCodeThread(hThread, &exitCode)){
+    if (hThreadPtr == NULL) return false;
+    if (GetExitCodeThread(*hThreadPtr, &exitCode)){
         if (exitCode == STILL_ACTIVE) {
             return true;
         } else {
-		    CloseHandle(hThread);
-            hThread = NULL;
+		    CloseHandle(*hThreadPtr);
+            *hThreadPtr = NULL;
             return false;
         }
     } else {
@@ -110,19 +110,19 @@ void enterSubMenu(MenuEntry* subMenu, int size) {
 }
 
 void action_downloadUIX() {
-    if(isBusy(hThread)) return;
+    if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Downloading UIX Lite..."),false);
 	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-latest.zip", "HDD0-E:\\uix-lite-latest.zip", DownloadCallback);
 }
 
 void action_downloadFonts() {
-    if(isBusy(hThread)) return;
+    if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Downloading Fonts..."),false);
     hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-fonts.zip", "HDD0-E:\\uix-lite-fonts.zip", DownloadCallback);
 }
 
 void action_downloadAudio() {
-    if(isBusy(hThread)) return;
+    if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Downloading Audio..."),false);
 	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-audio.zip", "HDD0-E:\\uix-lite-audio.zip", DownloadCallback);
 }
@@ -162,7 +162,7 @@ void installFromZip(){
     updateStatusMsg(strdup(success ? "UIX installed to C:\\" : "Install failed."),true);
 }
 void action_installFromZip() {
-    if (isBusy(hThread)) return; 
+    if (isBusy(&hThread)) return; 
     updateStatusMsg(strdup("Installing UIX..."),false);
     hThread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)installFromZip, 0, 0, NULL);
 }
@@ -172,7 +172,7 @@ void installFonts(){
     updateStatusMsg(strdup(success ? "Fonts installed to C:\\" : "Font install failed."),true);
 }
 void action_installFonts() {
-    if(isBusy(hThread)) return;
+    if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Installing Fonts..."),false);
     hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installFonts, 0, 0, NULL);
 }
@@ -183,17 +183,15 @@ void installAudio(){
     updateStatusMsg(strdup(success ? "Audio installed to C:\\" : "Audio install failed."),true);
 }
 void action_installAudio() {
-    if(isBusy(hThread)) return;
+    if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Installing Audio..."),false);
     hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installAudio, 0, 0, NULL);
 }
 
-void scanForDefaultXBE(const char* basePath, FILE* out) {
+void scanForDefaultXBE(const char* basePath) {
     WIN32_FIND_DATAA findFileData;
 	char searchPath[256];
 	sprintf(searchPath, "%s\\*",basePath);
-
-	updateStatusMsg(strdup("Refreshing icons..."),false);
 
     HANDLE hFind = FindFirstFileA(searchPath, &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) return;
@@ -209,20 +207,36 @@ void scanForDefaultXBE(const char* basePath, FILE* out) {
             // Check if default.xbe exists in this subdirectory
             bool Exists;
 			char xbePath[MAX_PATH];
-            sprintf(xbePath, "%s\\default.xbe", fullPath, findFileData.cFileName);
+
+            sprintf(xbePath, "%s\\default.xbe", fullPath);
 			fileSystem::fileExists(xbePath,Exists);
 
             if (Exists) {
-                uint32_t titleId = 0;
-				char* titleName = NULL;
+                updateStatusMsg(strdup(xbePath),false);
                 XBEParser parser;
                 parser.LoadXBE(xbePath);
+                uint32_t titleId = 0;
+                char* titleName = NULL;
 				if (parser.GetTitleName(titleName) && parser.GetTitleID(titleId)) {
-					fprintf(out, "%s=%08x\n", findFileData.cFileName, titleId);
-					if (strlen(IniUtility::GetValue("HDD0-C:\\UIX Configs\\TitleNames.ini", "default", findFileData.cFileName)) == 0) {
-						IniUtility::SetValue("HDD0-C:\\UIX Configs\\TitleNames.ini","default",findFileData.cFileName,titleName);
-					}
-				}
+                    char TitleId[9];
+                    sprintf(TitleId, "%08x", titleId);
+                    
+                    // Update Iconss.ini
+                    if (!IniUtility::SetValue("HDD0-C:\\UIX Configs\\Icons.ini","default",findFileData.cFileName,TitleId)) {
+                        updateStatusMsg(strdup("Failed to write Icons.ini"),true);
+                        return;
+                    }
+
+                    // Update TitleNames.ini
+                    char* existingTitle = IniUtility::GetValue("HDD0-C:\\UIX Configs\\TitleNames.ini", "default", findFileData.cFileName);
+                    if (strlen(existingTitle) == 0) {
+                        IniUtility::SetValue("HDD0-C:\\UIX Configs\\TitleNames.ini","default",findFileData.cFileName,titleName);
+                    }
+                    free(existingTitle);
+                } else {
+                    updateStatusMsg(strdup("Failed to get TitleID and TitleName."),true);
+                }
+                free(titleName);
 			}
         }
     } while (FindNextFileA(hFind, &findFileData));
@@ -230,29 +244,25 @@ void scanForDefaultXBE(const char* basePath, FILE* out) {
     FindClose(hFind);
 }
 void refreshIcons(){
-	FILE* out = fopen("HDD0-C:\\UIX Configs\\Icons.ini", "w");
-    if (!out) {
-        updateStatusMsg(strdup("Failed to write Icons.ini"),true);
-        return;
-    }
-
-    fprintf(out, "[default]\n");
-
-	pointerVector<char*>* Locations = new pointerVector<char*>(false);
+    IniUtility::DeleteSection("HDD0-C:\\UIX Configs\\Icons.ini","default");
+    pointerVector<char*>* Locations = new pointerVector<char*>(true);
 	int MaxLauncherItems = stringUtility::toInt(IniUtility::GetValue("HDD0-C:\\UIX Configs\\config.ini","LauncherMenu","MaxLauncherMenuItems"));
 	if (MaxLauncherItems == 0) MaxLauncherItems = 8;
 	for (int i = 0; i < MaxLauncherItems; i++)
 	{
 		char* value = IniUtility::GetValue("HDD0-C:\\UIX Configs\\config.ini","LauncherMenu",appendNumber("Path",i));
 		if (*value != '\0') {
-			pointerVector<char*>* Paths = stringUtility::split(value,";",false);
+			pointerVector<char*>* Paths = stringUtility::split(value,";",true);
 			for (size_t p = 0; p < Paths->count(); p++){
-				Locations->add(Paths->get(p));
+				Locations->add(strdup(Paths->get(p)));
 			}
+            delete Paths;
 		}
+        free(value);
 	}
     
 	pointerVector<char*>* drives = driveManager::getMountedDrives();
+    updateStatusMsg(strdup("Refreshing icons..."),false);
 	for (size_t d = 0; d < drives->count(); d++)
 	{
 		//Skip the C:,X:,Y:,and Z: partitions
@@ -265,17 +275,17 @@ void refreshIcons(){
 		{
 			char searchPath[256];
 			sprintf(searchPath, "%s:\\%s", drives->get(d),Locations->get(L));
-			scanForDefaultXBE(searchPath, out);
+			scanForDefaultXBE(searchPath);
 		}
 	}
-
-    fclose(out);
+    delete Locations; 
+    delete drives;
 	indexed = true;
     updateStatusMsg(strdup("Icons refreshed!"), true);
 }
 
 void action_refreshIcons() {
-    if (isBusy(hThread)) return;
+    if (isBusy(&hThread)) return;
 	updateStatusMsg(strdup(indexed ? "Refreshing icons..." : "Indexing the extended partitions..."),false);
 	hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)refreshIcons, 0, 0, NULL);
 }
@@ -491,7 +501,7 @@ void update_scene() {
         mSelectedControl = (mSelectedControl - 1 + currentMenuSize) % currentMenuSize;
     }
 
-    isBusy(hThread);
+    isBusy(&hThread);
     clearStatusMsg();
     network::init();
 }
