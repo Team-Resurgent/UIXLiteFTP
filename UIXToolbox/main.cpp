@@ -24,18 +24,7 @@
 #include "IniUtility.h"
 
 #define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ|D3DFVF_TEX1)
-
-char* StatusMsg = NULL;
-bool msgAutoClear = false;
-bool indexed = false;
-DWORD StatusSetTime = 0;
-DWORD menuNavDelay = 0;
-HANDLE hThread = NULL;
-void updateStatusMsg(char* msg,bool autoClear);
-void clearStatusMsg();
-void DownloadCallback(char* StatusMsg);
-void refreshicons();
-bool isBusy(HANDLE* hThreadPtr);
+#define MAX_MENU_DEPTH 5
 
 typedef struct MenuEntry {
     const char* label;
@@ -44,18 +33,37 @@ typedef struct MenuEntry {
     int subMenuSize;
 } MenuEntry;
 
-char* appendNumber(const char* original, int number);
-void enterSubMenu(MenuEntry* subMenu, int size);
-void goBack();
+char* StatusMsg = NULL;
+char* zipFile = NULL;
+bool unzipfile = false;
+bool chkVersion = false;
+bool msgAutoClear = false;
+bool indexed = false;
+bool legacySoftMod = false;
+DWORD StatusSetTime = 0;
+DWORD menuNavDelay = 0;
+HANDLE hThread = NULL;
 
 MenuEntry* currentMenu = NULL;
 int currentMenuSize = 0;
 int mSelectedControl = 0;
 
-#define MAX_MENU_DEPTH 5
 MenuEntry* menuStack[MAX_MENU_DEPTH];
 int menuSizeStack[MAX_MENU_DEPTH];
 int menuDepth = 0;
+
+void updateStatusMsg(char* msg,bool autoClear);
+void clearStatusMsg();
+void DownloadCallback(char* StatusMsg);
+void refreshicons();
+bool isBusy(HANDLE* hThreadPtr);
+void backupDash(bool restore = false);
+void installFromZipThread();
+int compareVersions(const char* versionA, const char* versionB);
+char* appendNumber(const char* original, int number);
+void enterSubMenu(MenuEntry* subMenu, int size);
+void goBack();
+void installFromZip();
 
 char* appendNumber(const char* original, int number) {
     // Buffer to hold the integer as a string
@@ -78,9 +86,43 @@ char* appendNumber(const char* original, int number) {
 }
 
 void DownloadCallback(void* data) {
+    if (!data) return;
 	char* msg = strdup(reinterpret_cast<char*>(data));
 	bool autoClear = strstr(msg,"Downloaded") == NULL;
 	updateStatusMsg(msg,autoClear);
+    if (strstr(msg,"Download complete.") != NULL) {
+        if (unzipfile) {
+            if (strstr(zipFile,"MSDash") != NULL) {
+                fileSystem::directoryDelete("HDD0-C:\\xboxdashdata.185ead00",true);
+            }
+            installFromZip();
+        } else if (chkVersion) {
+            chkVersion = false;
+            char* localVersion = IniUtility::GetValue("HDD0-E:\\TDATA\\fffe0000\\version", "default", "version");
+            char* latestVersion = IniUtility::GetValue("HDD0-E:\\TDATA\\fffe0000\\latest.ver", "", "version");
+            fileSystem::fileDelete("HDD0-E:\\TDATA\\fffe0000\\latest.ver");
+            if (!localVersion || !latestVersion) {
+                updateStatusMsg(strdup("Failed to read version files."), true);
+                if (localVersion) free(localVersion);
+                if (latestVersion) free(latestVersion);
+                return;
+            }
+            int result = compareVersions(localVersion,latestVersion);
+            free(localVersion);
+            free(latestVersion);
+            switch (result){
+                case 0:
+                    updateStatusMsg(strdup("You have the latest version."),true);
+                    break;
+                case -1:
+                    updateStatusMsg(strdup("There is an updated version available."),true);
+                    break;
+                default:
+                    updateStatusMsg(strdup("You're using an experimental build"),true);
+                    break;
+            }
+        }
+    }
 }
 
 bool isBusy(HANDLE* hThreadPtr){
@@ -98,6 +140,63 @@ bool isBusy(HANDLE* hThreadPtr){
         return false;
     }
 }
+
+void action_installUIX();
+void action_installMSDash();
+void action_installDiscord();
+void action_installBlacknWhiteSkin();
+void action_installBlueSkin();
+void action_installBloodRedSkin();
+void action_installCrystalSkin();
+void action_installDenimSkin();
+void action_installPurpleSkin();
+void action_installSkySkin();
+void action_installStockSkin();
+void action_checkForUpdate();
+void action_refreshIcons();
+void action_addMissingUDATA();
+
+void action_exit() { utils::ReturnToDashboard(); }
+
+MenuEntry submenu_updateUIX[] = {
+    { "Check for Update", action_checkForUpdate, NULL, 0 },
+    { "Install Latest Version", action_installUIX, NULL, 0 },
+    { "Install Discord Presence", action_installDiscord, NULL, 0 },
+    { "Install MSDash 5960", action_installMSDash, NULL, 0 },
+};
+
+MenuEntry submenu_manageIcons[] = {
+    { "Refresh Icons.ini", action_refreshIcons, NULL, 0 },
+    { "Add Missing UDATA", action_addMissingUDATA, NULL, 0 },
+    //{ "Install Audio", action_installAudio, NULL, 0 },
+};
+
+MenuEntry submenu_changeSkinMore[] = {
+    { "Install Denim Skin", action_installDenimSkin, NULL, 0 },
+    { "Install Purple Skin", action_installPurpleSkin, NULL, 0 },
+    { "Install Sky Skin", action_installSkySkin, NULL, 0 },
+    { "Install Stock Skin", action_installStockSkin, NULL, 0 },
+};
+
+MenuEntry submenu_changeSkin[] = {
+    { "Install Black & White Skin", action_installBlacknWhiteSkin, NULL, 0 },
+    { "Install Blood Red Skin", action_installBloodRedSkin, NULL, 0 },
+    { "Install Blue Skin", action_installBlueSkin, NULL, 0 },
+    { "Install Crystal Skin", action_installCrystalSkin, NULL, 0 },
+    { "More Skins...", NULL, submenu_changeSkinMore, sizeof(submenu_changeSkinMore) / sizeof(MenuEntry)  },
+};
+
+MenuEntry submenu_manageUIX[] = {
+	{ "Manage Launcher Icons", NULL, submenu_manageIcons, sizeof(submenu_manageIcons) / sizeof(MenuEntry)  },
+    { "Change UIX Lite Skin", NULL, submenu_changeSkin, sizeof(submenu_changeSkin) / sizeof(MenuEntry)  },
+    { "Update UIX Lite", NULL, submenu_updateUIX, sizeof(submenu_updateUIX) / sizeof(MenuEntry) },
+};
+
+MenuEntry mainMenu[] = {
+    { "Manage UIX Lite", NULL, submenu_manageUIX, sizeof(submenu_manageUIX)/sizeof(MenuEntry) },
+    { "Return to Dashboard", action_exit, NULL, 0 }
+};
+
 void enterSubMenu(MenuEntry* subMenu, int size) {
     if (menuDepth < MAX_MENU_DEPTH) {
         menuStack[menuDepth] = currentMenu;
@@ -109,83 +208,151 @@ void enterSubMenu(MenuEntry* subMenu, int size) {
     }
 }
 
-void action_downloadUIX() {
+void action_installUIX() {
     if(isBusy(&hThread)) return;
     updateStatusMsg(strdup("Downloading UIX Lite..."),false);
-	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-latest.zip", "HDD0-E:\\uix-lite-latest.zip", DownloadCallback);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/latest/uix-lite-latest.zip", "HDD0-E:\\TDATA\\fffe0000\\latest.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\latest.zip");
+    unzipfile = true;
 }
 
-void action_downloadFonts() {
+void action_installMSDash() {
     if(isBusy(&hThread)) return;
-    updateStatusMsg(strdup("Downloading Fonts..."),false);
-    hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-fonts.zip", "HDD0-E:\\uix-lite-fonts.zip", DownloadCallback);
+    updateStatusMsg(strdup("Downloading UIX Lite..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/MSDash/185ead00.zip", "HDD0-E:\\TDATA\\fffe0000\\MSDash.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\MSDash.zip");
+    unzipfile = true;
 }
 
-void action_downloadAudio() {
+void action_installDiscord() {
     if(isBusy(&hThread)) return;
-    updateStatusMsg(strdup("Downloading Audio..."),false);
-	hThread = socketUtility::downloadFile("milenko.org", "/uix-lite/uix-lite-audio.zip", "HDD0-E:\\uix-lite-audio.zip", DownloadCallback);
+    bool exists = false;
+    fileSystem::directoryExists("HDD0-C:\\Discord Presence", exists);
+    if (!exists) { fileSystem::directoryCreate("HDD0-C:\\Discord Presence"); }
+    updateStatusMsg(strdup("Downloading Discord Presence..."),false);
+    hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/ShortcutRelayXBE/default.xbe", "HDD0-C:\\Discord Presence\\Discord.xbe", DownloadCallback);
 }
 
-void action_refreshIcons();
-void action_installFromZip();
-void action_installFonts();
-void action_installAudio();
-void action_exit() { utils::ReturnToDashboard(); }
+void action_installBlacknWhiteSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Black & White Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/blacknwhite.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
 
-MenuEntry submenu_downloads[] = {
-    { "Download UIX Lite", action_downloadUIX, NULL, 0 },
-    { "Download Fonts", action_downloadFonts, NULL, 0 },
-    { "Download Audio", action_downloadAudio, NULL, 0 },
-};
+void action_installBlueSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Blue Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/blue.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
 
-MenuEntry submenu_installs[] = {
-    { "Install UIX Lite", action_installFromZip, NULL, 0 },
-    { "Install Fonts", action_installFonts, NULL, 0 },
-    { "Install Audio", action_installAudio, NULL, 0 },
-};
-MenuEntry submenu_manageUIX[] = {
-	{ "Refresh Icons", action_refreshIcons, NULL, 0 },
-    { "Downloads", NULL, submenu_downloads, sizeof(submenu_downloads) / sizeof(MenuEntry) },
-    { "Install", NULL, submenu_installs, sizeof(submenu_installs) / sizeof(MenuEntry) },
-};
+void action_installBloodRedSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Blood Red Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/bloodred.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
 
-MenuEntry mainMenu[] = {
-    { "Manage UIX Lite", NULL, submenu_manageUIX, sizeof(submenu_manageUIX)/sizeof(MenuEntry) },
-    { "Return to Dashboard", action_exit, NULL, 0 }
-};
+void action_installCrystalSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Crystal Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/crystal.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
+
+void action_installDenimSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Denim Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/denim.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
+
+void action_installPurpleSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Purple Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/purple.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
+
+void action_installSkySkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Sky Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/sky.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
+
+void action_installStockSkin(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading Stock Skin..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/skins/stock.zip", "HDD0-E:\\TDATA\\fffe0000\\skin.zip", DownloadCallback);
+    zipFile = strdup("HDD0-E:\\TDATA\\fffe0000\\skin.zip");
+    unzipfile = true;
+}
+
+void action_checkForUpdate(){
+    if(isBusy(&hThread)) return;
+    updateStatusMsg(strdup("Downloading UIX Lite..."),false);
+	hThread = socketUtility::downloadFile("TeamUIX.net", "/uix-lite/latest/version", "HDD0-E:\\TDATA\\fffe0000\\latest.ver", DownloadCallback);
+    chkVersion = true;
+}
+
+void action_addMissingUDATA() {
+}
+
+void backupDash(bool restore) {
+    if (restore) {
+        fileSystem::fileDelete("HDD0-C:\\xb0xdash.xbe");
+        fileSystem::fileMove("HDD0-C:\\xboxdash.xbe","HDD0-C:\\xb0xdash.xbe");
+        fileSystem::fileMove("HDD0-C:\\xboxdash.bak","HDD0-C:\\xboxdash.xbe");
+    } else {
+        fileSystem::fileMove("HDD0-C:\\xboxdash.xbe","HDD0-C:\\xboxdash.bak");
+    }
+}
 
 // Quick implementation of CrunchBite's xunzip library
-void installFromZip();
-void installFromZip(){
-    bool success = xExtractZip("HDD0-E:\\uix-lite-latest.zip", "HDD0-C:\\", true, true);
-    updateStatusMsg(strdup(success ? "UIX installed to C:\\" : "Install failed."),true);
-}
-void action_installFromZip() {
-    if (isBusy(&hThread)) return; 
-    updateStatusMsg(strdup("Installing UIX..."),false);
-    hThread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)installFromZip, 0, 0, NULL);
-}
-void installFonts();
-void installFonts(){
-    bool success = xExtractZip("HDD0-E:\\uix-lite-fonts.zip", "HDD0-C:\\", true, true);
-    updateStatusMsg(strdup(success ? "Fonts installed to C:\\" : "Font install failed."),true);
-}
-void action_installFonts() {
-    if(isBusy(&hThread)) return;
-    updateStatusMsg(strdup("Installing Fonts..."),false);
-    hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installFonts, 0, 0, NULL);
+void installFromZipThread(){
+    if (legacySoftMod) backupDash();
+    bool success = xExtractZip(strdup(zipFile), "HDD0-C:\\", true, true);
+    updateStatusMsg(strdup(success ? "Install complete." : "Install failed."),true);
+    if (legacySoftMod) backupDash(true);
+    zipFile = NULL;
+    unzipfile = false;
 }
 
-void installAudio();
-void installAudio(){
-    bool success = xExtractZip("HDD0-E:\\uix-lite-audio.zip", "HDD0-C:\\Audio\\", true, true);
-    updateStatusMsg(strdup(success ? "Audio installed to C:\\" : "Audio install failed."),true);
+void installFromZip() {
+    updateStatusMsg(strdup("Installing..."),false);
+    hThread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)installFromZipThread, 0, 0, NULL);
 }
-void action_installAudio() {
-    if(isBusy(&hThread)) return;
-    updateStatusMsg(strdup("Installing Audio..."),false);
-    hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)installAudio, 0, 0, NULL);
+
+int compareVersions(const char* versionA, const char* versionB) {
+    const char* ptrA = versionA;
+    const char* ptrB = versionB;
+
+    while (*ptrA != '\0' || *ptrB != '\0') {
+        int numA = 0;
+        while (*ptrA >= '0' && *ptrA <= '9') {
+            numA = numA * 10 + (*ptrA - '0');
+            ptrA++;
+        }
+        int numB = 0;
+        while (*ptrB >= '0' && *ptrB <= '9') {
+            numB = numB * 10 + (*ptrB - '0');
+            ptrB++;
+        }
+        if (numA < numB) return -1;
+        if (numA > numB) return 1;
+        if (*ptrA == '.') ptrA++;
+        if (*ptrB == '.') ptrB++;
+    }
+    return 0; 
 }
 
 void scanForDefaultXBE(const char* basePath) {
@@ -262,7 +429,7 @@ void refreshIcons(){
 	}
     
 	pointerVector<char*>* drives = driveManager::getMountedDrives();
-    updateStatusMsg(strdup("Refreshing icons..."),false);
+    updateStatusMsg(strdup("Refreshing the Icons.ini..."),false);
 	for (size_t d = 0; d < drives->count(); d++)
 	{
 		//Skip the C:,X:,Y:,and Z: partitions
@@ -281,7 +448,7 @@ void refreshIcons(){
     delete Locations; 
     delete drives;
 	indexed = true;
-    updateStatusMsg(strdup("Icons refreshed!"), true);
+    updateStatusMsg(strdup("Icons.ini refreshed!"), true);
 }
 
 void action_refreshIcons() {
@@ -530,7 +697,7 @@ void render_scene()
 
     drawing::drawBitmapStringAligned(
         context::getBitmapFontSmall(),
-        "Welcome to UIX Lite FTPd. Powered by PrometheOS.",
+        "Welcome to UIX Toolbox. FTPd Powered by PrometheOS.",
         theme::getFooterTextColor(),
         horizAlignmentCenter,
         193,
@@ -633,7 +800,8 @@ void __cdecl main()
 	{
 		network::init();
 	}
-
+    
+    fileSystem::fileExists("HDD0-C:\\xb0xdash.xbe",legacySoftMod);
 	drawing::loadFont(&font_sfn[0]);
 
 	bitmapFont* fontSmall = drawing::generateBitmapFont("FreeSans", SSFN_STYLE_REGULAR, 18, 18, 0, 256);

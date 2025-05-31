@@ -263,6 +263,7 @@ bool WINAPI socketUtility::downloadThread(LPVOID lParam)
 
     WSAEVENT hEvent = WSACreateEvent();
     XNDNS* pDns = NULL;
+    Params->callback("Resolving host.");
 
     if (XNetDnsLookup(Params->hostname, hEvent, &pDns) != 0 || WaitForSingleObject(hEvent, 5000) != WAIT_OBJECT_0 || !pDns || pDns->iStatus != 0)
     {
@@ -274,6 +275,7 @@ bool WINAPI socketUtility::downloadThread(LPVOID lParam)
 
     IN_ADDR addr = pDns->aina[0];
     XNetDnsRelease(pDns);
+    Params->callback("Host resolved.");
 
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET) return false;
@@ -297,6 +299,8 @@ bool WINAPI socketUtility::downloadThread(LPVOID lParam)
         "Host: %s\r\n"
         "Connection: close\r\n\r\n",
         Params->path, Params->hostname);
+
+    Params->callback("Requesting file...");
 
     send(sock, request, strlen(request), 0);
 

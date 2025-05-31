@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="UIXLiteFTP"
+	Name="UIXToolbox"
 	ProjectGUID="{03813F8D-2AD5-44E4-B724-44240DB90B0B}"
-	RootNamespace="UIXLiteFTP"
+	RootNamespace="UIXToolbox"
 	Keyword="XboxProj">
 	<Platforms>
 		<Platform
@@ -36,7 +36,7 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="xapilibd.lib d3d8d.lib d3dx8d.lib xgraphicsd.lib xonlined.lib dsoundd.lib xboxkrnl.lib"
+				AdditionalDependencies="xapilibd.lib d3d8d.lib d3dx8d.lib xgraphicsd.lib xonlined.lib dsoundd.lib xboxkrnl.lib xunzip.lib"
 				OutputFile="$(OutDir)/$(ProjectName).exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories=""
@@ -60,7 +60,7 @@
 				ForceCopy="TRUE"/>
 			<Tool
 				Name="XboxImageTool"
-				FileName="$(TargetDir)UIXLiteFTP.xbe"
+				FileName="$(TargetDir)UIXToolbox.xbe"
 				StackSize="0x40000"
 				IncludeDebugInfo="TRUE"
 				LimitAvailableMemoryTo64MB="FALSE"
@@ -68,7 +68,7 @@
 				DontMountUD="TRUE"
 				NoLibWarn="TRUE"
 				TitleID="0x43423130"
-				TitleName="UIXLiteFTP"
+				TitleName="UIXToolbox"
 				TitleImage=""
 				XBEVersion="1"/>
 		</Configuration>
@@ -124,13 +124,13 @@
 				ForceCopy="TRUE"/>
 			<Tool
 				Name="XboxImageTool"
-				FileName="$(TargetDir)UIXLiteFTP.xbe"
+				FileName="$(TargetDir)UIXToolbox.xbe"
 				StackSize="0x20000"
 				LimitAvailableMemoryTo64MB="FALSE"
 				DontModifyHD="TRUE"
 				DontMountUD="TRUE"
 				TitleID="0x43423130"
-				TitleName="UIXLiteFTP"
+				TitleName="UIXToolbox"
 				TitleImage=""
 				XBEVersion="1"/>
 		</Configuration>
