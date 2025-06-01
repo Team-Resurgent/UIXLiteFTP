@@ -98,31 +98,34 @@ char* IniUtility::GetValue(const char* filename, const char* section, const char
 bool IniUtility::SetValue(const char* filename, const char* section, const char* key, const char* value)
 {
     FILE* file = fopen(filename, "rb");
-    if (!file) return false;
+    bool fileExists = (file != NULL);
+    char* fileContent = NULL;
+    long fileSize = 0;
 
-    // Get file size
-    fseek(file, 0, SEEK_END);
-    long fileSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    // Allocate memory to read the entire file
-    char* fileContent = new char[fileSize + 1]; // +1 for null terminator
-    if (!fileContent)
+    if (fileExists)
     {
-        fclose(file);
-        return false;
-    }
+        // Get file size
+        fseek(file, 0, SEEK_END);
+        fileSize = ftell(file);
+        fseek(file, 0, SEEK_SET);
 
-    // Read the entire file into memory
-    fread(fileContent, 1, fileSize, file);
-    fileContent[fileSize] = '\0'; // Null terminate the string
-    fclose(file);
+        fileContent = new char[fileSize + 1]; // +1 for null terminator
+        if (!fileContent)
+        {
+            fclose(file);
+            return false;
+        }
+
+        fread(fileContent, 1, fileSize, file);
+        fileContent[fileSize] = '\0';
+        fclose(file);
+    }
 
     // Prepare buffer for the new content
     char* newContent = new char[fileSize + 1280]; // Allocate some extra space for new content
     if (!newContent)
     {
-        delete[] fileContent;
+        if (fileContent) delete[] fileContent;
         return false;
     }
     newContent[0] = '\0'; // Start with an empty string
@@ -135,65 +138,68 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
     bool inGlobalSection = true;
     bool firstFormatDetected = false;
     bool useSpaces = false; // Determines if spaces should be used around '='
-    char* currentLine = strtok(fileContent, "\r\n");
-	
-    while (currentLine)
+    if (fileExists && fileContent)
     {
-        strncpy(line, currentLine, sizeof(line) - 1);
-        line[sizeof(line) - 1] = '\0'; // Ensure null-termination
-        char* trimmedLine = trim(line);
-
-        if (*trimmedLine == '\0' || *trimmedLine == ';')
+        char* currentLine = strtok(fileContent, "\r\n");
+    	
+        while (currentLine)
         {
-            strcat(newContent, line);
-            strcat(newContent, "\r\n");
-            currentLine = strtok(NULL, "\r\n");
-            continue;
-        }
+            strncpy(line, currentLine, sizeof(line) - 1);
+            line[sizeof(line) - 1] = '\0'; // Ensure null-termination
+            char* trimmedLine = trim(line);
 
-        char foundKey[256], foundValue[MAX_VALUE_SIZE];
-        bool lineHasSpaces;
-        if (isSection(trimmedLine, currentSection))
-        {
-            if (!keyUpdated && strcmp(previousSection, section) == 0)
+            if (*trimmedLine == '\0' || *trimmedLine == ';')
             {
-                strcat(newContent, keyStr);
-                strcat(newContent, useSpaces ? " = " : "=");
-                strcat(newContent, valueStr);
+                strcat(newContent, line);
                 strcat(newContent, "\r\n");
-                keyUpdated = true;
-            }
-            strcpy(previousSection, currentSection);
-            strcat(newContent, line);
-            strcat(newContent, "\r\n");
-            inGlobalSection = false;
-            currentLine = strtok(NULL, "\r\n");
-            continue;
-        }
-
-        if (isKeyValuePair(trimmedLine, foundKey, foundValue, lineHasSpaces))
-        {
-            if (!firstFormatDetected)
-            {
-                useSpaces = lineHasSpaces;
-                firstFormatDetected = true;
-            }
-
-            if ((inGlobalSection || strcmp(currentSection, section) == 0) && strcmp(foundKey, keyStr) == 0)
-            {
-                strcat(newContent, keyStr);
-                strcat(newContent, useSpaces ? " = " : "=");
-                strcat(newContent, valueStr);
-                strcat(newContent, "\r\n");
-                keyUpdated = true;
                 currentLine = strtok(NULL, "\r\n");
                 continue;
             }
-        }
 
-        strcat(newContent, line);
-        strcat(newContent, "\r\n");
-        currentLine = strtok(NULL, "\r\n");
+            char foundKey[256], foundValue[MAX_VALUE_SIZE];
+            bool lineHasSpaces;
+            if (isSection(trimmedLine, currentSection))
+            {
+                if (!keyUpdated && strcmp(previousSection, section) == 0)
+                {
+                    strcat(newContent, keyStr);
+                    strcat(newContent, useSpaces ? " = " : "=");
+                    strcat(newContent, valueStr);
+                    strcat(newContent, "\r\n");
+                    keyUpdated = true;
+                }
+                strcpy(previousSection, currentSection);
+                strcat(newContent, line);
+                strcat(newContent, "\r\n");
+                inGlobalSection = false;
+                currentLine = strtok(NULL, "\r\n");
+                continue;
+            }
+
+            if (isKeyValuePair(trimmedLine, foundKey, foundValue, lineHasSpaces))
+            {
+                if (!firstFormatDetected)
+                {
+                    useSpaces = lineHasSpaces;
+                    firstFormatDetected = true;
+                }
+
+                if ((inGlobalSection || strcmp(currentSection, section) == 0) && strcmp(foundKey, keyStr) == 0)
+                {
+                    strcat(newContent, keyStr);
+                    strcat(newContent, useSpaces ? " = " : "=");
+                    strcat(newContent, valueStr);
+                    strcat(newContent, "\r\n");
+                    keyUpdated = true;
+                    currentLine = strtok(NULL, "\r\n");
+                    continue;
+                }
+            }
+
+            strcat(newContent, line);
+            strcat(newContent, "\r\n");
+            currentLine = strtok(NULL, "\r\n");
+        }
     }
     if (!keyUpdated)
     {
@@ -215,7 +221,7 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
     file = fopen(filename, "wb");
     if (!file)
     {
-        delete[] fileContent;
+        if (fileContent) delete[] fileContent;
         delete[] newContent;
         return false;
     }
@@ -225,7 +231,7 @@ bool IniUtility::SetValue(const char* filename, const char* section, const char*
 
     // Clean up
     fclose(file);
-    delete[] fileContent;
+    if (fileContent) delete[] fileContent;
     delete[] newContent;
 
     return true;
@@ -441,7 +447,7 @@ bool IniUtility::DeleteSection(const char* filename, const char* section)
     }
     newContent[0] = '\0'; // Start with an empty string
 
-    char line[MAX_LINE_SIZE], currentSection[256];
+    char line[MAX_LINE_SIZE];
     bool sectionDeleted = false;
     bool inTargetSection = false;
     bool deleteGlobal = isNullOrEmpty(section);

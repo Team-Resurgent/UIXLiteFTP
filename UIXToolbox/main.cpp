@@ -35,11 +35,13 @@ typedef struct MenuEntry {
 
 char* StatusMsg = NULL;
 char* zipFile = NULL;
+char* UDATA = strdup("HDD0-E:\\UDATA");
 bool unzipfile = false;
 bool chkVersion = false;
 bool msgAutoClear = false;
 bool indexed = false;
 bool legacySoftMod = false;
+bool addUDATA = false;
 DWORD StatusSetTime = 0;
 DWORD menuNavDelay = 0;
 HANDLE hThread = NULL;
@@ -305,6 +307,8 @@ void action_checkForUpdate(){
 }
 
 void action_addMissingUDATA() {
+    addUDATA = true;
+    action_refreshIcons();
 }
 
 void backupDash(bool restore) {
@@ -400,6 +404,31 @@ void scanForDefaultXBE(const char* basePath) {
                         IniUtility::SetValue("HDD0-C:\\UIX Configs\\TitleNames.ini","default",findFileData.cFileName,titleName);
                     }
                     free(existingTitle);
+                    if (addUDATA && parser.HasTitleImage()) {
+                        bool Exists = false;
+                        char* udataPath = fileSystem::combinePath(UDATA, TitleId);
+                        if (!udataPath) return;
+                        fileSystem::directoryExists(udataPath, Exists);
+                        if (!Exists) {
+                            fileSystem::directoryCreate(udataPath);
+                            char* titleImagePath = fileSystem::combinePath(udataPath, "TitleImage.xbx");
+                            parser.SaveTitleImage(titleImagePath);
+                            free(titleImagePath);
+                            char* metaPath = fileSystem::combinePath(udataPath, "TitleMeta.xbx");
+                            IniUtility::SetValue(metaPath, "", "TitleName", titleName);
+                            free(metaPath);
+                        } else {
+                            char* titleImagePath = fileSystem::combinePath(udataPath, "TitleImage.xbx");
+                            fileSystem::fileExists(titleImagePath, Exists);
+                            if (!Exists) parser.SaveTitleImage(titleImagePath);
+                            free(titleImagePath);
+                            char* metaPath = fileSystem::combinePath(udataPath, "TitleMeta.xbx");
+                            fileSystem::fileExists(metaPath, Exists);
+                            if (!Exists) IniUtility::SetValue(metaPath, "", "TitleName", titleName);
+                            free(metaPath);
+                        }
+                        free(udataPath);
+                    }
                 } else {
                     updateStatusMsg(strdup("Failed to get TitleID and TitleName."),true);
                 }
@@ -429,7 +458,7 @@ void refreshIcons(){
 	}
     
 	pointerVector<char*>* drives = driveManager::getMountedDrives();
-    updateStatusMsg(strdup("Refreshing the Icons.ini..."),false);
+    updateStatusMsg(strdup((addUDATA) ? "Adding Missing UDATA..." : "Refreshing the Icons.ini..."),false);
 	for (size_t d = 0; d < drives->count(); d++)
 	{
 		//Skip the C:,X:,Y:,and Z: partitions
@@ -448,12 +477,13 @@ void refreshIcons(){
     delete Locations; 
     delete drives;
 	indexed = true;
-    updateStatusMsg(strdup("Icons.ini refreshed!"), true);
+    updateStatusMsg(strdup((addUDATA) ? "Missing UDATA Added!" : "Icons.ini refreshed!"), true);
+    addUDATA = false;
 }
 
 void action_refreshIcons() {
     if (isBusy(&hThread)) return;
-	updateStatusMsg(strdup(indexed ? "Refreshing icons..." : "Indexing the extended partitions..."),false);
+    updateStatusMsg(strdup(indexed ? (addUDATA) ? "Adding Missing UDATA..." : "Refreshing the Icons.ini..." : "Indexing the extended partitions..."),false);
 	hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)refreshIcons, 0, 0, NULL);
 }
 
